@@ -15,7 +15,6 @@
 #include "MetaContext.h"
 #include <map>
 #include <nlohmann/json.hpp>
-#include <iomanip>
 
 namespace mc {
 
@@ -24,14 +23,6 @@ namespace mc {
     }
 
     const constexpr std::string_view no_prefix;
-
-    IdentifierHelper::~IdentifierHelper() {
-        nlohmann::json json;
-        json["idents"] = definedIdents;
-        json["externals"] = externalIdents;
-        std::ofstream jsonOut(outJson);
-        jsonOut << std::setw(4) << json;
-    }
 
     std::string IdentifierHelper::id(const clang::Type *ty, std::string_view prefix) {
         auto res(typeIdentifierMap.find(ty));
@@ -206,18 +197,5 @@ namespace mc {
         tos << ">";
         os << replaceIllegalIdentifierChars(tos.str().str());
         return fmt::format("{}{}", prefix, os.str());
-    }
-
-
-    bool IdentifierHelper::isDefined([[maybe_unused]]const std::string &identifier) {
-        return definedIdents.find(identifier) != definedIdents.end();
-    }
-
-    void IdentifierHelper::defineIdentifier([[maybe_unused]]const std::string &identifier) {
-        definedIdents.insert(identifier);
-    }
-
-    void IdentifierHelper::expectExternalIdentifier(const std::string &identifier) {
-        externalIdents.insert(identifier);
     }
 }

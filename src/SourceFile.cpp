@@ -12,7 +12,9 @@ namespace mc {
         { "::", "_sr_" },
         { " ", "_" },
         { ",", "_comma_" },
-        { ".", "_dot_"}
+        { ".", "_dot_"},
+        { "(", "_Pa_"},
+        { ")", "_aP_"}
     };
 
     std::string replaceIllegalIdentifierChars(std::string_view name) {

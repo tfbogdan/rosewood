@@ -37,13 +37,16 @@ namespace mc {
 
     GeneratingASTVisitor::GeneratingASTVisitor(const clang::PrintingPolicy &pPolicy)
         :out(mcOutput),
-        idman(pPolicy, mcJsonOutput),
+        idman(pPolicy),
+        idrepo(),
         printingPolicy(pPolicy) {
 
         out << "#include <mc/MetaType.h>\n";
     }
 
-    GeneratingASTVisitor::~GeneratingASTVisitor() {}
+    GeneratingASTVisitor::~GeneratingASTVisitor() {
+        idrepo.save(mcJsonOutput.getValue());
+    }
 
     
     bool GeneratingASTVisitor::VisitCXXRecordDecl(const clang::CXXRecordDecl *record) {
@@ -53,6 +56,9 @@ namespace mc {
             for(const auto method: record->methods()) {
                 if (method->getAccess() == clang::AccessSpecifier::AS_public) {
                     genTypeDescriptor(method->getReturnType().getTypePtr());
+                    for(const auto arg: method->parameters()) {
+                        genTypeDescriptor(arg->getType().getTypePtr());
+                    }
                 }
             }
         }
@@ -90,7 +96,7 @@ namespace mc {
     void GeneratingASTVisitor::genTypeDescriptor(const clang::Type *ty) {
         auto identifier = idman.id(ty);
 
-        if (idman.isDefined(identifier)) return;
+        if (idrepo.isDefined(identifier)) return;
 
         switch (ty->getTypeClass()) {
         case clang::Type::TypeClass::Builtin: {
@@ -100,125 +106,62 @@ namespace mc {
             //            identifier, mcBuiltInName, btIn->getCanonicalTypeInternal().getAsString(printingPolicy));
             fmt::print(out, "const extern metal::BuiltinType {};\n",
                        identifier);
-            idman.expectExternalIdentifier(identifier);
+            idrepo.expectExternalIdentifier(identifier);
         } break;
-        /*
+
         case clang::Type::TypeClass::Pointer: {
             auto pTy = static_cast<const clang::PointerType *>(ty);
             auto pointee = pTy->getPointeeType();
-            auto pteeIdent(genIdentifier(pointee.getTypePtr()));
-            if (!isDefined(pteeIdent))
+            auto pteeIdent(idman.id(pointee.getTypePtr()));
+            if (!idrepo.isDefined(pteeIdent))
                 genTypeDescriptor(pointee.getTypePtr());
-
-            source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::PointerType", identifier,
-                std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::AnonymousVariable>(std::string("metal::QualType"), std::vector<std::shared_ptr<Expression>>{
-                        std::make_shared<mc::BoolLiteral>(pointee.isConstQualified()),
-                        std::make_shared<mc::BoolLiteral>(pointee.isVolatileQualified()),
-                        std::make_shared<mc::BoolLiteral>(pointee.isRestrictQualified()),
-                        std::make_shared<mc::AddressOf>(pteeIdent)
-                    }),
-                    std::make_shared<mc::CStringLiteral>(pointee.getAsString(printingPolicy) + "*")
-                }
-            ));
-
+            fmt::print(out, "const metal::PointerType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
         } break;
+
         case clang::Type::TypeClass::LValueReference: {
             auto pTy = static_cast<const clang::LValueReferenceType *>(ty);
             auto pointee = pTy->getPointeeType();
-            auto pteeIdent(genIdentifier(pointee.getTypePtr()));
-            if (!isDefined(pteeIdent))
+            auto pteeIdent(idman.id(pointee.getTypePtr()));
+            if (!idrepo.isDefined(pteeIdent))
                 genTypeDescriptor(pointee.getTypePtr());
-
-            source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::LReferenceType", identifier,
-                std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::AnonymousVariable>(std::string("metal::QualType"), std::vector<std::shared_ptr<Expression>>{
-                        std::make_shared<mc::BoolLiteral>(pointee.isConstQualified()),
-                            std::make_shared<mc::BoolLiteral>(pointee.isVolatileQualified()),
-                            std::make_shared<mc::BoolLiteral>(pointee.isRestrictQualified()),
-                            std::make_shared<mc::AddressOf>(pteeIdent)
-                    }),
-                    std::make_shared<mc::CStringLiteral>(pointee.getAsString(printingPolicy) + "&")
-                }
-            ));
-
+            fmt::print(out, "const metal::LReferenceType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
         } break;
+
         case clang::Type::TypeClass::RValueReference: {
             auto pTy = static_cast<const clang::RValueReferenceType *>(ty);
             auto pointee = pTy->getPointeeType();
-            auto pteeIdent(genIdentifier(pointee.getTypePtr()));
-            if (!isDefined(pteeIdent))
+            auto pteeIdent(idman.id(pointee.getTypePtr()));
+            if (!idrepo.isDefined(pteeIdent))
                 genTypeDescriptor(pointee.getTypePtr());
-
-            source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::RReferenceType", identifier,
-                std::vector<std::shared_ptr<Expression>>{
-                std::make_shared<mc::AnonymousVariable>(std::string("metal::QualType"), std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::BoolLiteral>(pointee.isConstQualified()),
-                        std::make_shared<mc::BoolLiteral>(pointee.isVolatileQualified()),
-                        std::make_shared<mc::BoolLiteral>(pointee.isRestrictQualified()),
-                        std::make_shared<mc::AddressOf>(pteeIdent)
-                    }),
-                    std::make_shared<mc::CStringLiteral>(pointee.getAsString(printingPolicy) + "&&")
-                }
-            ));
-
-
+            fmt::print(out, "const metal::RReferenceType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
         } break;
 
         case clang::Type::TypeClass::Typedef: {
             auto tty = static_cast<const clang::TypedefType*>(ty);
             auto tdecl = tty->getDecl();
-            auto ttIdent(genIdentifier(tdecl->getUnderlyingType().getTypePtr()));
-            if (!isDefined(ttIdent))
+            auto ttIdent(idman.id(tdecl->getUnderlyingType().getTypePtr()));
+            if (!idrepo.isDefined(ttIdent))
                 genTypeDescriptor(tdecl->getUnderlyingType().getTypePtr());
-
-            source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::TypedefType", identifier,
-                std::vector<std::shared_ptr<Expression>>{
-                std::make_shared<mc::AnonymousVariable>(std::string("metal::QualType"), std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::BoolLiteral>(tdecl->getUnderlyingType().isConstQualified()),
-                        std::make_shared<mc::BoolLiteral>(tdecl->getUnderlyingType().isVolatileQualified()),
-                        std::make_shared<mc::BoolLiteral>(tdecl->getUnderlyingType().isRestrictQualified()),
-                        std::make_shared<mc::AddressOf>(ttIdent)
-                    }),
-                    std::make_shared<mc::CStringLiteral>(tdecl->getQualifiedNameAsString())
-                }
-            ));
-
-
+            fmt::print(out, "const metal::TypedefType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, tdecl->getUnderlyingType().isConstQualified(), tdecl->getUnderlyingType().isVolatileQualified(), tdecl->getUnderlyingType().isRestrictQualified(), ttIdent, tdecl->getQualifiedNameAsString());
         } break;
+
         case clang::Type::TypeClass::Elaborated: {
             auto ety = static_cast<const clang::ElaboratedType*>(ty);
-
-            auto ttIdent(genIdentifier(ety->getNamedType().getTypePtr()));
-            if (!isDefined(ttIdent))
+            auto ttIdent(idman.id(ety->getNamedType().getTypePtr()));
+            if (!idrepo.isDefined(ttIdent))
                 genTypeDescriptor(ety->getNamedType().getTypePtr());
 
-            source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::TypedefType", identifier,
-                std::vector<std::shared_ptr<Expression>>{
-                std::make_shared<mc::AnonymousVariable>(std::string("metal::QualType"), std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::BoolLiteral>(ety->getNamedType().isConstQualified()),
-                        std::make_shared<mc::BoolLiteral>(ety->getNamedType().isVolatileQualified()),
-                        std::make_shared<mc::BoolLiteral>(ety->getNamedType().isRestrictQualified()),
-                        std::make_shared<mc::AddressOf>(ttIdent)
-                    }),
-                    std::make_shared<mc::CStringLiteral>(ety->getNamedType().getAsString(printingPolicy))
-                }
-            ));
-
-
+            fmt::print(out, "const metal::TypedefType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, ety->getNamedType().isConstQualified(), ety->getNamedType().isVolatileQualified(), ety->getNamedType().isRestrictQualified(), ttIdent, ety->getNamedType().getAsString(printingPolicy));
         } break;
-
 
         case clang::Type::TypeClass::TemplateSpecialization: {
             auto tty = static_cast<const clang::TemplateSpecializationType*>(ty);
             auto decl = tty->getAsCXXRecordDecl();
             const bool isInMainFile(decl->getASTContext().getSourceManager().isInMainFile(decl->getLocation()));
-            if (isInMainFile) {
 
+            if (isInMainFile) {
                 llvm::SmallVector<char, 255> ttt;
                 llvm::raw_svector_ostream ot(ttt);
-                // clang::QualType::print(ty, clang::Qualifiers(), ot, printingPolicy, llvm::Twine());
-                // tty->getTemplateName().print(ot, printingPolicy);
 
                 auto spec = static_cast<const clang::ClassTemplateSpecializationDecl*>(decl);
                 spec->printQualifiedName(ot);
@@ -233,36 +176,33 @@ namespace mc {
                     arg.print(printingPolicy, ot);
                 }
                 ot << ">";
-
-                source.addExpression(std::make_shared<mc::VariableDefinition>("const metal::RecordType", identifier,
-                    std::vector<std::shared_ptr<Expression>>{
-                    std::make_shared<mc::AddressOf>(genIdentifier(static_cast<const clang::Decl *>(tty->getAsCXXRecordDecl()))),
-                        std::make_shared<mc::CStringLiteral>(ot.str().str())
-                    }
-                ));
-                fmt::u
-
+                fmt::print(out, "const metal::RecordType {} ({}, \"{}\");\n",
+                           identifier, idman.id(static_cast<const clang::Decl *>(tty->getAsCXXRecordDecl())), tty->getAsCXXRecordDecl()->getQualifiedNameAsString());
+            } else {
+                idrepo.expectExternalIdentifier(identifier);
+                fmt::print(out, "extern const metal::RecordType {};\n", identifier);
             }
 
         } break;
-*/
+
         case clang::Type::TypeClass::Record: {
             auto tty = static_cast<const clang::RecordType*>(ty);
 
             const bool isInMainFile(tty->getDecl()->getASTContext().getSourceManager().isInMainFile(tty->getDecl()->getLocation()));
             if (isInMainFile) {
-                fmt::print(out, "const metal::RecordType {} ( {} {});\n",
+                fmt::print(out, "const metal::RecordType {} ({}, \"{}\");\n",
                            identifier, idman.id(static_cast<const clang::Decl *>(tty->getAsCXXRecordDecl())), tty->getDecl()->getQualifiedNameAsString());
             } else {
-                idman.expectExternalIdentifier(identifier);
+                idrepo.expectExternalIdentifier(identifier);
                 fmt::print(out, "extern const metal::RecordType {};\n", identifier);
-
             }
+
         } break;
         default:
+            fmt::print(out, "// Type kind {} is not handled\n", ty->getCanonicalTypeInternal().getAsString(printingPolicy));
             break;
         }
-        idman.defineIdentifier(identifier);
+        idrepo.defineIdentifier(identifier);
 
     }
 

@@ -126,7 +126,7 @@ namespace metal {
     class TypedefType : public Type {
     public:
         TypedefType() = delete;
-        TypedefType(QualType &syn, const char *name)
+        TypedefType(QualType syn, const char *name)
             :Type(Type::TK_Typedef, name),
             underlying(syn) {}
 

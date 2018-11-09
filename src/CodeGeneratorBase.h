@@ -42,15 +42,8 @@ const constexpr std::string_view g_Decl_Prefix = "__metal__Decl__";
 
     class IdentifierHelper {
     public:
-        explicit IdentifierHelper(const clang::PrintingPolicy &pPolicy, const std::string& identJson)
-            :printingPolicy(pPolicy),
-            outJson(identJson) {}
-
-        ~IdentifierHelper();
-
-        bool isDefined(const std::string &identifier);
-        void defineIdentifier(const std::string &identifier);
-        void expectExternalIdentifier(const std::string &identifier);
+        explicit IdentifierHelper(const clang::PrintingPolicy &pPolicy)
+            :printingPolicy(pPolicy) {}
 
         std::string id(const clang::Type *ty, std::string_view prefix = g_Type_Prefix);
         std::string id(const clang::QualType &ty, std::string_view prefix = "");
@@ -73,8 +66,6 @@ const constexpr std::string_view g_Decl_Prefix = "__metal__Decl__";
         /* a series of maps to avoid recomputing identifiers for the same names */
         std::map<const clang::Type*, std::string> typeIdentifierMap;
         std::map<const clang::Decl*, std::string> declIdentifierMap;
-        std::set<std::string> definedIdents;
-        std::set<std::string> externalIdents;
 
         /* end of maps */
         const clang::PrintingPolicy& printingPolicy;

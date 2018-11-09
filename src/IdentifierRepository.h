@@ -1,14 +1,17 @@
-#ifndef IdentifierRepository_H_Included
-#define IdentifierRepository_H_Included
+#pragma once
 
 #pragma warning(push, 0)
 
 #pragma warning(pop)
+
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
+#include <experimental/filesystem>
 
 namespace mc {
+    namespace fs = std::experimental::filesystem;
 
     struct IdentifierInfo {
         std::string name;
@@ -17,19 +20,21 @@ namespace mc {
 
     class IdentifierRepository {
     public: 
+        explicit IdentifierRepository(const fs::path &source);
         IdentifierRepository() = default;
 
-        void loadFromFile(const std::string &file);
-        void writeToFile(const std::string &file);
+        void save(const fs::path &file);
 
-        bool isSymbolDefined(const std::string &name) const;
-        void defineIdentifier(const std::string &name);
+        bool isDefined(const std::string &identifier) const;
+        void defineIdentifier(const std::string &identifier);
+        void expectExternalIdentifier(const std::string &identifier);
+
     private:
 
-        std::string fileName;
+        std::set<std::string> definedIdents;
+        std::set<std::string> externalIdents;
         std::map<std::string, IdentifierInfo> identifierMap;
     };
 
 }
 
-#endif // IdentifierRepository_H_Included

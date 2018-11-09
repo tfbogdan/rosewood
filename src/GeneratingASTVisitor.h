@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CodeGeneratorBase.h"
+#include "IdentifierRepository.h"
 
 #pragma warning(push, 0)
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -41,6 +42,8 @@ namespace mc {
 
         std::ofstream out;
         mc::IdentifierHelper idman;
+        mc::IdentifierRepository idrepo;
+
         const clang::PrintingPolicy &printingPolicy;
     };
 
