@@ -10,6 +10,8 @@
 #include <llvm/Support/CommandLine.h>
 #pragma warning(pop)
 
+extern llvm::cl::opt<std::string> mcOutput;
+extern llvm::cl::opt<std::string> mcJsonOutput;
 
 static const std::unordered_map<clang::BuiltinType::Kind, std::string_view> builtinTypes {
     { clang::BuiltinType::Kind::Void, "BK_Void"},
@@ -33,12 +35,12 @@ static const std::unordered_map<clang::BuiltinType::Kind, std::string_view> buil
 namespace mc {
     namespace fs = std::experimental::filesystem;
 
-    GeneratingASTVisitor::GeneratingASTVisitor(const std::string& outputFile, const clang::PrintingPolicy &pPolicy)
-        :out(fs::path(outputFile).replace_extension("metagen.cpp")),
-        idman(pPolicy, fs::path(outputFile).replace_extension("idents.json")),
+    GeneratingASTVisitor::GeneratingASTVisitor(const clang::PrintingPolicy &pPolicy)
+        :out(mcOutput),
+        idman(pPolicy, mcJsonOutput),
         printingPolicy(pPolicy) {
 
-        out << "#include <MetaType.h>\n";
+        out << "#include <mc/MetaType.h>\n";
     }
 
     GeneratingASTVisitor::~GeneratingASTVisitor() {}

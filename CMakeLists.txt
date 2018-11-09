@@ -21,4 +21,9 @@ add_subdirectory(src)
 
 install(EXPORT mc DESTINATION lib/cmake/mc NAMESPACE mc)
 configure_file(cmake/mc-config.cmake.in lib/cmake/mc/mc-config.cmake @ONLY)
+configure_file(cmake/CMakeDetermineMcCompiler.cmake.in lib/cmake/mc/CMakeDetermineMcCompiler.cmake @ONLY)
+configure_file(cmake/CMakeMcCompiler.cmake.in lib/cmake/mc/CMakeMcCompiler.cmake.in COPYONLY)
+configure_file(cmake/CMakeMcInformation.cmake.in lib/cmake/mc/CMakeMcInformation.cmake @ONLY)
+configure_file(cmake/CMakeTestMcCompiler.cmake.in lib/cmake/mc/CMakeTestMcCompiler.cmake @ONLY)
+
 export(TARGETS mc mcruntime FILE lib/cmake/mc/mc-exports.cmake)

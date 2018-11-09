@@ -25,15 +25,11 @@
 #include "RuntimeReflectionDataSourceGenerator.h"
 #include "MetaPreambleHeaderGenerator.h"
 
-extern llvm::cl::opt<std::string> mcOutputDirectory;
-extern llvm::cl::opt<std::string> mcIdentifierRepository;
 namespace mc {
     ActionFactory::ActionFactory() {
-        mcContext.identRepository.loadFromFile(mcIdentifierRepository);
     }
 
     ActionFactory::~ActionFactory() {
-        mcContext.identRepository.writeToFile(mcIdentifierRepository);
     }
 
     clang::FrontendAction *ActionFactory::create() {
@@ -220,18 +216,8 @@ namespace mc {
         */
     }
 
-    std::string buildOutputFile(llvm::StringRef iFile) {
-        namespace fs = std::experimental::filesystem;
-        const fs::path inputFilePath = iFile.str();
-        const fs::path inputFileName = inputFilePath.filename().replace_extension();
-
-        std::string oDir = mcOutputDirectory.getValue();
-        const fs::path outputDir = mcOutputDirectory.getValue();
-        return outputDir / inputFileName;
-    }
-
     MetadataTransformingConsumer::MetadataTransformingConsumer(llvm::StringRef iFile, mc::Context &mcContext, const clang::PrintingPolicy &pPolicy)
-        :visitor(buildOutputFile(iFile), pPolicy),
+        :visitor(pPolicy),
         inputFile(iFile),
         mcContext(mcContext) {}
 

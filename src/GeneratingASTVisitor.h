@@ -16,7 +16,7 @@ namespace mc {
         : public clang::RecursiveASTVisitor<GeneratingASTVisitor> {
 
     public:
-        explicit GeneratingASTVisitor(const std::string& outputFile, const clang::PrintingPolicy &pPolicy);
+        explicit GeneratingASTVisitor(const clang::PrintingPolicy &pPolicy);
         ~GeneratingASTVisitor();
 
         bool VisitCXXRecordDecl(const clang::CXXRecordDecl *Record);

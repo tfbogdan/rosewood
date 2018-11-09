@@ -12,8 +12,9 @@
 #include "clang_infrastructure.h"
 
 llvm::cl::OptionCategory mcOptionsCategory("mc options");
-llvm::cl::opt<std::string> mcOutputDirectory("od", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("output directory for generated files"));
-llvm::cl::opt<std::string> mcIdentifierRepository("idents", llvm::cl::cat(mcOptionsCategory), llvm::cl::Optional, llvm::cl::desc("identifier repository file. if it does not exist, it shall be created. "));
+llvm::cl::opt<std::string> mcOutput("o", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("cpp metadata output file"));
+llvm::cl::opt<std::string> mcJsonOutput("j", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("json metadata output file"));
+
 
 int main(int argc, const char **argv) {
 
