@@ -1,0 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
+
+
+SET(CMAKE_MC_COMPILER_WORKS 1 CACHE INTERNAL "")

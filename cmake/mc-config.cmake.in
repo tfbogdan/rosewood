@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.10)
+
+# find_package(Clang REQUIRED)
+# list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/mc-toolchain)
+include (mc-targets.cmake)
+
+macro(reflectable_class target classname)
+	target_sources(${target} PRIVATE ${classname}.h ${classname}.cpp)
+	get_target_property(TGT_INCLUDE_DIRS ${target} INCLUDE_DIRECTORIES)
+	get_target_property(TGT_DEFS ${target} COMPILE_DEFINITIONS)
+	set(includeDirs "$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>")
+	set(compileDefs "$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>")
+	add_custom_command(
+		# TDO: clang builtins path handling. A clang tool is expected to have a certain position relative to the clang installation and we don't respect that (or we should copy the headers)
+                COMMAND mc ${CMAKE_CURRENT_SOURCE_DIR}/${classname}.h -od ${CMAKE_CURRENT_BINARY_DIR} -idents ${classname}_identifiers.json -- -I${CLANG_CMAKE_DIR}/../../clang/7.0.1/include "$<$<BOOL:${includeDirs}>:-I$<JOIN:${includeDirs},;-I>>" "$<$<BOOL:${compileDefs}>:-D$<JOIN:${compileDefs},;-D>>" -fsyntax-only
+                OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${classname}.metagen.cpp ${classname}_identifiers.json
+		COMMENT "Generating reflection data for ${classname}"
+		DEPENDS ${classname}.h
+		COMMAND_EXPAND_LISTS
+	)
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${classname}.metagen.cpp ${classname}_identifiers.json)
+endmacro()
