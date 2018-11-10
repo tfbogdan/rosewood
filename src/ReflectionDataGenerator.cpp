@@ -1,4 +1,4 @@
-#include "GeneratingASTVisitor.h"
+#include "ReflectionDataGenerator.h"
 
 #include <unordered_map>
 #include <string_view>

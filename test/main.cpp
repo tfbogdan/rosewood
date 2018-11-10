@@ -1,7 +1,7 @@
 #include "Jinx.h"
 #include "Jinx.metadata.h"
 
-#include <mc/MetaType.h>
+#include <mc/mc.hpp>
 #include <iostream>
 #include <functional>
 

@@ -5,8 +5,6 @@
 #include <llvm/Support/raw_ostream.h>
 #pragma warning(pop)
 
-#include "SourceFile.h"
-
 namespace clang {
     class CXXRecordDecl;
     class EnumDecl;
@@ -36,10 +34,14 @@ namespace clang {
 #include <map>
 
 namespace mc {
+std::string replaceIllegalIdentifierChars(std::string_view name);
 
 const constexpr std::string_view g_Type_Prefix = "__metal__Ty__";
 const constexpr std::string_view g_Decl_Prefix = "__metal__Decl__";
 
+    /**
+     * @brief The IdentifierHelper class is essentially unused right now but it might come in handy so it's keep just a little longer
+     */
     class IdentifierHelper {
     public:
         explicit IdentifierHelper(const clang::PrintingPolicy &pPolicy)

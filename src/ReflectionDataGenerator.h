@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CodeGeneratorBase.h"
+#include "IdentifierHelper.h"
 #include "IdentifierRepository.h"
 
 #pragma warning(push, 0)

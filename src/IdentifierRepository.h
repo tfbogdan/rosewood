@@ -18,6 +18,9 @@ namespace mc {
         bool defined = false;
     };
 
+    /**
+     * @brief The IdentifierRepository class has a purpose but it's still an abstract concept: must keep track of what a module exports and write that data to a json.
+     */
     class IdentifierRepository {
     public: 
         explicit IdentifierRepository(const fs::path &source);

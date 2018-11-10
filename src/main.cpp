@@ -9,7 +9,7 @@
 #include <string> 
 #include <fmt/printf.h>
 
-#include "clang_infrastructure.h"
+#include "ClangInfrastructure.h"
 
 llvm::cl::OptionCategory mcOptionsCategory("mc options");
 llvm::cl::opt<std::string> mcOutput("o", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("cpp metadata output file"));
@@ -18,9 +18,7 @@ llvm::cl::opt<std::string> mcJsonOutput("j", llvm::cl::cat(mcOptionsCategory), l
 
 
 int main(int argc, const char **argv) {
-    LLVMInitializeX86TargetInfo();
-    LLVMInitializeX86TargetMC();
-    LLVMInitializeX86AsmParser();
+    llvm::InitializeNativeTarget();
 
     clang::tooling::CommonOptionsParser OptionsParser(argc, argv, mcOptionsCategory);
     clang::tooling::ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());

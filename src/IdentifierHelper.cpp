@@ -1,4 +1,4 @@
-#include "CodeGeneratorBase.h"
+#include "IdentifierHelper.h"
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -12,11 +12,37 @@
 #include <clang/AST/ASTContext.h>
 #pragma warning(pop)
 
-#include "MetaContext.h"
 #include <map>
 #include <nlohmann/json.hpp>
 
 namespace mc {
+
+        const std::map<std::string, std::string> specialCharacterMap{
+        { "*", "_ptr_" },
+        { "&", "_lvRef_" },
+        { "&&","_rvRef_" },
+        { "<", "_lt_" },
+        { ">", "_gt_" },
+        { "::", "_sr_" },
+        { " ", "_" },
+        { ",", "_comma_" },
+        { ".", "_dot_"},
+        { "(", "_Pa_"},
+        { ")", "_aP_"}
+    };
+
+    std::string replaceIllegalIdentifierChars(std::string_view name) {
+        std::string res(name);
+        for (const auto &illegalSeq : specialCharacterMap) {
+            auto index = res.find(illegalSeq.first, 0);
+            while (index != std::string::npos) {
+                res.erase(index, illegalSeq.first.length());
+                res.insert(index, illegalSeq.second);
+                index = res.find(illegalSeq.first, 0);
+            }
+        }
+        return res;
+    }
 
     constexpr std::string_view sif(bool value, std::string_view iftrue, std::string_view otherwise="") {
         return value ? iftrue : otherwise;
