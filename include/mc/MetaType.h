@@ -4,6 +4,8 @@
 #include "QualType.h"
 
 #include <cstdint>
+#include <functional>
+#include <string_view>
 
 namespace metal {
 
@@ -12,7 +14,7 @@ namespace metal {
     class Type {
     public:
         
-        typedef enum : std::uint8_t {
+        typedef enum : int8_t {
             TK_Builtin, 
             TK_Pointer, 
             TK_LValRef,
@@ -23,32 +25,28 @@ namespace metal {
             TK_Transparent
         } Kind;
 
-        Type() = delete;
-        Type(Kind k, const char *Name)
+        constexpr Type(Kind k, std::string_view Name)
             :kind(k),
             name(Name) {}
 
-        virtual ~Type();
-
-        Kind getKind() const { return kind; }
+        constexpr inline Kind getKind() const { return kind; }
+        constexpr inline std::string_view getName() const { return name; }
     private:
-        Kind kind;
-        const char *name;
+        const Kind kind;
+        const std::string_view name;
     };
 
     class TransparentType : public Type {
     public:
-        TransparentType(const char *name)
+        constexpr TransparentType(std::string_view name)
             :Type(Type::Kind::TK_Transparent, name) {}
-
-        virtual ~TransparentType() = default;
 
     };
 
     class BuiltinType : public Type {
     public:
         
-        typedef enum {
+        typedef enum : int8_t {
             BK_Void, 
             BK_Char,
             BK_UChar, 
@@ -67,102 +65,185 @@ namespace metal {
             BK_Bool
         } BuiltinKind;    
 
-        explicit BuiltinType(BuiltinKind k, const char *name)
-            :Type(Type::TK_Builtin, name) {}
-
-        virtual ~BuiltinType() = default;
+        constexpr BuiltinType(BuiltinKind k, std::string_view name)
+            :Type(Type::TK_Builtin, name),
+            kind(k) {}
 
         BuiltinKind getBuiltinKind() const { return kind; }
     private:
-        BuiltinKind kind;
+        const BuiltinKind kind;
     };
 
     class IndirectionType : public Type {
     public:
-        IndirectionType() = delete;
-        IndirectionType(QualType t, Type::Kind k, const char *name) :
+        constexpr IndirectionType(QualType t, Type::Kind k, std::string_view name) :
             Type(k, name),
             pointee(t) {}
 
-        virtual ~IndirectionType() = default;
-
     private:
-        QualType pointee;
+        const QualType pointee;
     };
 
     class PointerType : public IndirectionType {
     public:
-        PointerType() = delete;
-        PointerType(QualType t, const char *name)
+        constexpr PointerType(QualType t, std::string_view name)
             :IndirectionType(t, Type::Kind::TK_Pointer, name) {}
-
-        virtual ~PointerType() = default;
 
     private:
     };
 
     class LReferenceType : public IndirectionType {
     public:
-        LReferenceType() = delete;
-        LReferenceType(QualType t, const char *name)
+        constexpr LReferenceType(QualType t, std::string_view name)
             :IndirectionType(t, Type::Kind::TK_LValRef, name) {}
-
-        virtual ~LReferenceType() = default;
 
     private:
     };
 
     class RReferenceType : public IndirectionType {
     public:
-        RReferenceType() = delete;
-        RReferenceType(QualType t, const char *name)
+        RReferenceType(QualType t, std::string_view name)
             :IndirectionType(t, Type::Kind::TK_RValRef, name) {}
-
-        virtual ~RReferenceType() = default;
-
     private:
     };
 
     class TypedefType : public Type {
     public:
-        TypedefType() = delete;
-        TypedefType(QualType syn, const char *name)
+        constexpr TypedefType(QualType syn, std::string_view name)
             :Type(Type::TK_Typedef, name),
             underlying(syn) {}
-
-        virtual ~TypedefType() = default;
-
     private:
-        QualType underlying;
+        const QualType underlying;
     };
 
 
     class TagDecl;
     class RecordDecl;
+
     class RecordType : public Type {
     public:
-        RecordType(const metal::RecordDecl *rec, const char *name)
+        constexpr RecordType(const metal::RecordDecl &rec, std::string_view name)
             :Type(Type::Kind::TK_DeclTyp, name),
             record(rec) {}
 
-        virtual ~RecordType() = default;
-
     private:
-        const metal::RecordDecl *record;
+        const metal::RecordDecl &record;
     };
 
-    class EnumDecl;
+    template<typename EnumDeclType>
     class EnumType : public Type {
     public:
-        EnumType(const metal::EnumDecl *dec, const char *name)
+        constexpr EnumType(const EnumDeclType &dec, std::string_view name)
             :Type(Type::Kind::TK_EnumType, name),
             decl(dec) {}
 
-        virtual ~EnumType() = default;
     private:
-        const metal::EnumDecl *decl;
+        const EnumDeclType &decl;
     };
 
 
 }
 
+
+namespace meta {
+
+    struct nil_t {};
+    template <typename T>
+    struct type_map {};
+
+    template <typename tuple_t, unsigned tuple_pos>
+    struct inspect_element {
+
+    };
+
+    template<typename tuple_t>
+    struct descent_into_tuple {
+        template <typename query>
+        constexpr bool any_matches(query q);
+    };
+
+    template <typename T>
+    bool constexpr name_matches([[maybe_unused]]T val, std::string_view name) {
+        return T::name == name;
+    }
+
+    template<typename T>
+    bool constexpr has_method(std::string_view name) {
+        using meta_type = typename type_map<T>::meta_type;
+        using methods_tuple_type = typename meta_type::methods;
+        bool found_method = false;
+        std::apply([&name, &found_method](auto ...meth) {
+            found_method = found_method || ((name_matches(meth, name), ...));
+        }, methods_tuple_type());
+        return found_method;
+    }
+
+    struct type {
+        static constexpr bool is_type = true;
+    };
+
+    struct Namespace {
+        static constexpr bool is_namespace = true;
+    };
+
+    struct builtin_void : public type {
+        static constexpr std::string_view name = "void";
+    };
+
+    struct builtin_char : public type {
+        static constexpr std::string_view name = "char";
+    };
+
+    struct builtin_uchar : public type {
+        static constexpr std::string_view name = "unsigned char";
+    };
+
+    struct builtin_wchar : public type {
+        static constexpr std::string_view name = "wchar_t";
+    };
+
+    struct builtin_short : public type {
+        static constexpr std::string_view name = "short";
+    };
+
+    struct builtin_ushort : public type {
+        static constexpr std::string_view name = "unsigned short";
+    };
+
+    struct builtin_int : public type {
+        static constexpr std::string_view name = "int";
+    };
+
+    struct builtin_uint : public type {
+        static constexpr std::string_view name = "unsigned int";
+    };
+
+    struct builtin_long : public type {
+        static constexpr std::string_view name = "long";
+    };
+
+    struct builtin_ulong : public type {
+        static constexpr std::string_view name = "unsigned long";
+    };
+
+    struct builtin_longlong : public type {
+        static constexpr std::string_view name = "long long";
+    };
+
+    struct builtin_ulonglong : public type {
+        static constexpr std::string_view name = "unsigned long long";
+    };
+
+    struct builtin_float : public type {
+        static constexpr std::string_view name = "float";
+    };
+
+    struct builtin_double : public type {
+        static constexpr std::string_view name = "double";
+    };
+
+    struct builtin_bool : public type {
+        static constexpr std::string_view name = "bool";
+    };
+
+}

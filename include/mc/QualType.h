@@ -6,21 +6,24 @@
 namespace metal {
     class Type;
 
-    class __MC(qual_type) QualType {
+    class QualType {
     public:
-        QualType() = delete;
-        __MC(ctor) QualType(bool isConst, bool isVolatile, bool isRestrict, const Type *t)
+        constexpr QualType(bool isConst, bool isVolatile, bool isRestrict, const Type &t)
             :is_const(isConst),
             is_volatile(isVolatile),
             is_restrict(isRestrict),
             typ(t) {}
 
+        constexpr inline bool isConst() const { return is_const; }
+        constexpr inline bool isVolatile() const { return is_volatile; }
+        constexpr inline bool isRestrict() const { return is_restrict; }
+        constexpr inline const Type &getUnderlyingType() const { return typ; }
 
     private:
-        bool is_const : 1;
-        bool is_volatile : 1;
-        bool is_restrict : 1;
-        const Type *typ;
+        const bool is_const : 1;
+        const bool is_volatile : 1;
+        const bool is_restrict : 1;
+        const Type &typ;
 
     };
 

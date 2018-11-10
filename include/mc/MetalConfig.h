@@ -1,6 +1,4 @@
-#ifndef MetalConfig_h_Included
-#define MetalConfig_h_Included
-
+#pragma once
 #include <vector>
 
 #ifdef __MC__PARSER_LIBRARY
@@ -97,6 +95,8 @@ virtual const metal::RecordDecl *metaClass() \
 
 
 namespace metal {
+    struct nil_t {};
+
     template < typename ClassTy >
     struct InvokableDispatcher {
 
@@ -155,6 +155,3 @@ namespace metal {
     };
 }
 
-
-
-#endif // MetalConfig_h_Included

@@ -94,6 +94,7 @@ namespace mc {
     }
 
     void GeneratingASTVisitor::genTypeDescriptor(const clang::Type *ty) {
+        return;
         auto identifier = idman.id(ty);
 
         if (idrepo.isDefined(identifier)) return;

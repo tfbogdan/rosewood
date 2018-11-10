@@ -3,5 +3,4 @@
 
 namespace metal {
 
-    Type::~Type() = default;
 }

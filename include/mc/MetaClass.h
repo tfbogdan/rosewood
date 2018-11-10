@@ -1,25 +1,22 @@
-#ifndef MetaClass_H_Included
-#define MetaClass_H_Included
-
+#pragma once
 
 
 #include "MetalConfig.h"
 #include "QualType.h"
 
-#include <vector>
+#include <array>
 #include <cstdint>
+#include <string_view>
 
 namespace metal {
-    class MethodDecl;
     class Function;
     class Enum;
     class Property;
-    class Argument;
     class Property;
 
     class Decl {
     public:
-        typedef enum {
+        typedef enum : int8_t {
             Record, 
             Enum, 
             Method,
@@ -27,106 +24,84 @@ namespace metal {
             Namespace
         } Kind;
 
-        Decl() = delete;
-        Decl(const Decl &) = delete;
-        Decl(Decl &&) = delete;
-        Decl &operator=(const Decl &) = delete;
-        Decl &operator=(Decl &&) = delete;
+        constexpr Decl(Kind k, std::string_view Id)
+            :identifier(Id),
+            kind(k) {}
 
-        Decl(Kind k, const char * Id)
-            :kind(k),
-            identifier(Id) {}
-
-        virtual ~Decl() = default;
-
-        Kind getKind() const { return kind; }
+        constexpr inline Kind getKind() const { return kind; }
     private:
-
-        const char *identifier;
-        Kind kind;
+        const std::string_view identifier;
+        const Kind kind;
     };
 
     class NamespaceDecl : public Decl {
     public:
-        NamespaceDecl() = delete;
-        NamespaceDecl(const char *Name);
-        virtual ~NamespaceDecl() = default;
-
-
-    private:
-
-    };
-
-    class TypeDecl : public Decl {
-    public:
-        TypeDecl() = delete;
-        TypeDecl(const Type *t, Decl::Kind k, const char *Id);
-
-        virtual ~TypeDecl() = default;
-
-
-    private:
-        const Type *type;
-    };
-
-
-    class RecordDecl : public TypeDecl {
-    public:
-        RecordDecl( const char *name,
-                    const Type *type);
-
-        virtual ~RecordDecl() = default;
-
+        constexpr NamespaceDecl(std::string_view Name)
+            :Decl(Decl::Kind::Namespace, Name) {}
 
     private:
     };
 
-    class Argument {
-        const char *name;
-        metal::QualType type;
+    struct Argument {
+        const std::string_view name;
+        const metal::QualType type;
     };
 
+    template< unsigned numArgs>
     class MethodDecl : public Decl {
     public:
-        MethodDecl() = delete;
-        MethodDecl(const char *Signature, const char *Name, std::initializer_list<Argument> &&Args, metal::methodCallUnpacker_t unpacker, bool isConst, bool isVirtual);
+        constexpr MethodDecl(std::string_view Signature, std::string_view Name, const Type& Ret ,std::array<Argument, numArgs> &&Args, bool isConst, bool isVirtual)
+            :Decl(Decl::Kind::Method, Name),
+             signature(Signature),
+             returns(Ret),
+             args(Args),
+             is_const (isConst),
+             is_virtual(isVirtual) {}
 
-        virtual ~MethodDecl() = default;
-
-
-    private:
-
-        const char *name;
-        std::vector<Argument> args;
-        metal::methodCallUnpacker_t unpacker;
-        bool is_const : 1;
-        bool is_virtual : 1;
+        const std::string_view signature;
+        const Type& returns;
+        std::array<Argument, numArgs> args;
+        const bool is_const : 1;
+        const bool is_virtual : 1;
     };
 
-    class PropertyDecl {
-        const char *name;
-        metal::QualType type;
-        MethodDecl *getter;
-        MethodDecl *setter;
-        MethodDecl *notify;
-    };
-
-    class Enumerator {
-        const char *name;
-        std::int64_t    val;
-    };
-
-    class EnumDecl : public TypeDecl {
+    class RecordDecl : public Decl {
     public:
-        EnumDecl() = delete;
-        EnumDecl(const char *Name, std::initializer_list<Enumerator> &&Enumerators, const Type *type);
+        constexpr RecordDecl(std::string_view name)
+            :Decl(Decl::Kind::Record, name) {}
 
-        virtual ~EnumDecl() = default;
     private:
-        std::vector<Enumerator> enumerators;
+    };
+
+    class FieldDecl {
+        const std::string_view name;
+        const metal::QualType type;
+    };
+
+    template<unsigned numCtors, unsigned numMethods, unsigned numFields>
+    class RecordDeclImpl : public RecordDecl {
+    public:
+
+    };
+
+    struct Enumerator {
+        constexpr Enumerator(std::string_view Name, std::int64_t V)
+            :name(Name), value(V) {}
+
+        const std::string_view name;
+        const std::int64_t    value;
+    };
+
+    template<unsigned numEnumerators>
+    class EnumDecl : public Decl {
+    public:
+        constexpr EnumDecl(std::string_view Name, std::array<Enumerator, numEnumerators> &&enums)
+            :Decl(Decl::Kind::Enum, Name),
+            enumerators(enums) {}
+
+        const std::array<Enumerator, numEnumerators> enumerators;
     };
 
 
 }
 
-#endif // MetaClass_H_Included
