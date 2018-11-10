@@ -39,7 +39,11 @@ namespace mc {
     MetadataTransformingConsumer::MetadataTransformingConsumer(const clang::ASTContext &context)
         :generator(context) {}
 
-    void MetadataTransformingConsumer::HandleTranslationUnit(clang::ASTContext &) {
+    void MetadataTransformingConsumer::HandleTranslationUnit(clang::ASTContext &context) {
+        clang::PrintingPolicy ppCopy(context.getPrintingPolicy());
+        ppCopy.SuppressUnwrittenScope = false;
+        ppCopy.TerseOutput = false;
+        context.setPrintingPolicy(ppCopy);
         generator.Generate();
     }
 

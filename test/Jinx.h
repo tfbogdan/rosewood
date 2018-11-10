@@ -21,6 +21,9 @@ namespace jinx {
 
         int aMethod();
 
+        void overloadedMethod();
+        void overloadedMethod(int i);
+
     private:
         std::string name;
     };

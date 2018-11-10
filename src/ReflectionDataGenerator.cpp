@@ -2,9 +2,12 @@
 
 #include <unordered_map>
 #include <string_view>
+#include <map>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <experimental/filesystem>
+
+#include <iostream>
 
 #pragma warning(push, 0)
 #pragma warning(pop)
@@ -45,8 +48,7 @@ namespace mc {
         printingPolicy(astContext.getPrintingPolicy()) {
 
         global_scope.putline("#pragma once");
-        global_scope.putline("#include <string_view>");
-        global_scope.putline("#include <tuple>");
+        global_scope.putline("#include <mc/mc.hpp>");
         global_scope.putline("");
         global_scope.putline("namespace mc {{");
     }
@@ -58,7 +60,8 @@ namespace mc {
     }
 
     void ReflectionDataGenerator::Generate() {
-        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue());
+        printingPolicy = context.getPrintingPolicy();
+        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue(), "mc::Module");
 
         for(const auto decl: context.getTranslationUnitDecl()->decls()) {
             // first cull out everything that isn't defined withing the `main` file
@@ -100,13 +103,13 @@ namespace mc {
         if (!Method->isOverloadedOperator()) {
             auto qualName = Method->getQualifiedNameAsString();
             auto name = Method->getNameAsString();
-            auto ownScope = where.spawn(name, qualName);
+            auto ownScope = where.spawn(name, qualName, "mc::Method");
             putname;
             ownScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
             std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
             for (const auto param: parameters) {
                 auto parmName = param->getNameAsString();
-                auto paramScope = ownScope.spawn(parmName, parmName);
+                auto paramScope = ownScope.spawn(parmName, parmName, "mc::Parameter");
                 paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
                 ownScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
             }
@@ -135,7 +138,7 @@ namespace mc {
     }
 
     template <typename declRangeT>
-    void fold_range(std::string_view withName, scope where, const declRangeT &range) {
+    void wrap_range_in_tuple(std::string_view withName, scope where, const declRangeT &range) {
         const std::size_t numElements = std::size(range);
         if (numElements == 0) {
             where.putline("using {} = std::tuple<>;", withName);
@@ -147,9 +150,13 @@ namespace mc {
 
         for(std::size_t idx(0); idx < numElements; ++idx) {
             const auto& item = range[idx];
-            auto itemName = item->getNameAsString();
             initScope.indent();
-            initScope.rawput(itemName);
+            if constexpr (std::is_same<std::string, typename declRangeT::value_type>::value) {
+                initScope.rawput(item);
+            } else {
+                auto itemName = item->getNameAsString();
+                initScope.rawput("meta_{}", itemName);
+            }
             if (idx < (numElements - 1)) {
                 initScope.rawput(",");
             }
@@ -158,64 +165,143 @@ namespace mc {
         where.putline(">;");
     }
 
+    void genMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
+        // this should be more elaborate and should consider all method attributes ( is const for example )
+        descScope.putline("static constexpr auto call = [] (");
+        scope argList = descScope.inner.spawn().spawn();
+        const std::size_t numArgs = Method->param_size();
+        const bool isConstructor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
+        const bool isImplicit = isConstructor ? static_cast<const clang::CXXConstructorDecl*>(Method)->isImplicit() : false;
+
+        if (isConstructor) {
+            argList.putline("void *addr{}", numArgs > 0 ? ",": "");
+        } else {
+            argList.putline("{}::{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": "");
+        }
+
+        std::size_t index(0);
+        for (const auto arg: Method->parameters()) {
+            argList.putline("{} {}{}", arg->getType().getAsString(Method->getASTContext().getPrintingPolicy()),  isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            ++index;
+        }
+        descScope.putline(") {{");
+        if (isConstructor) {
+            argList.putline("new (addr) ::{} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
+        } else {
+            argList.putline("return obj.{} (", Method->getNameAsString());
+        }
+        auto callArgList = argList.spawn().spawn();
+        index = 0;
+        for (const auto arg: Method->parameters()) {
+            callArgList.putline("{} {}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            ++index;
+        }
+        descScope.putline("{}}};", isConstructor ? (numArgs > 0 ? ");" : "") : ");");
+
+        // const ::{0}, args...) { return ::{1}};", Record->getQualifiedNameAsString(), Method->getQualifiedNameAsString());
+    }
+
     void ReflectionDataGenerator::exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where) {
         auto qualName = Record->getQualifiedNameAsString();
         auto name = Record->getNameAsString();
-        auto ownScope = where.spawn(name, qualName);
-
-        std::vector<const clang::CXXMethodDecl*> methods;
-
+        auto ownScope = where.spawn(name, qualName, "mc::Class");
+        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
+        ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
+        std::vector<std::string> method_descriptors;
+        // in order to do overloading we need to do three passes over all methods
+        std::map<std::string, std::vector<clang::CXXMethodDecl*>> method_groups;
         for(const auto Method: Record->methods()) {
-            const bool isCtor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
-            const bool overloadedOperator = Method->isOverloadedOperator();
-            const bool isDtor = Method->getKind() == clang::Decl::Kind::CXXDestructor;
+            method_groups[Method->getNameAsString()].push_back(Method);
+        }
 
-            // this captures constructors too so skip those
-            if (!overloadedOperator && !isCtor && !isDtor) {
-                auto methodQualName = Method->getQualifiedNameAsString();
-                auto methodName = Method->getNameAsString();
-                auto methodScope = ownScope.spawn(methodName, methodQualName);
-                methodScope.putline("static constexpr std::string_view name = \"{}\";", methodName);
+        for(const auto& [overloadGroupName, overloads]: method_groups) {
+            if(overloads.size() == 1u) {
+                const auto Method = overloads[0];
+                const bool isCtor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
+                const bool overloadedOperator = Method->isOverloadedOperator();
+                const bool isDtor = Method->getKind() == clang::Decl::Kind::CXXDestructor;
+                const auto methodQualName = Method->getQualifiedNameAsString();
 
-                methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
+                if (!overloadedOperator && !isCtor && !isDtor) {
+                    auto methodScope = ownScope.spawn(overloadGroupName, methodQualName, "mc::Method");
+                    methodScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
+                    genMethodDispatcher(methodScope, Method, Record);
+                    methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
 
-                std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
-                for (const auto param: parameters) {
-                    auto parmName = param->getNameAsString();
-                    auto paramScope = methodScope.spawn(parmName, parmName);
-                    paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
-                    methodScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+                    std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
+                    for (const auto param: parameters) {
+                        auto parmName = param->getNameAsString();
+                        auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
+                        paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
+                        methodScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+                    }
+                    wrap_range_in_tuple("parameters", methodScope.inner, parameters);
+                    method_descriptors.emplace_back(fmt::format("meta_{}", Method->getNameAsString()));
                 }
-                fold_range("parameters", methodScope.inner, parameters);
-                methods.push_back(Method);
+            } else {
+                const bool isCtorGrp = overloadGroupName == name;
+                const auto methodQualName = overloads[0]->getQualifiedNameAsString();
+                auto overloadScope = ownScope.spawn(isCtorGrp ? "ctor" : overloadGroupName, methodQualName, "mc::OverloadSet");
+                overloadScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
+                std::vector<std::string> overloadNames;
+
+                for(const auto Method: overloads) {
+                    const auto methodQualName = Method->getQualifiedNameAsString();
+                    const auto overloadName = fmt::format("overload_{}", overloadNames.size());
+                    auto methodScope = overloadScope.spawn(overloadName, methodQualName, "mc::Method");
+                    methodScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
+                    methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
+                    genMethodDispatcher(methodScope, Method, Record);
+
+                    std::vector<std::string> parameters;
+                    for (const auto param: Method->parameters()) {
+                        auto parmName = param->getNameAsString();
+                        if (isCtorGrp) {
+                            const auto ctorDecl = static_cast<clang::CXXConstructorDecl*>(Method);
+                            if(ctorDecl->isImplicit()) {
+                                parmName = fmt::format("implicit_arg_{}", parameters.size());
+                            }
+                        }
+
+                        auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
+                        paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
+                        paramScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+                        parameters.emplace_back(fmt::format("meta_{}",parmName));
+                    }
+                    wrap_range_in_tuple("parameters", methodScope.inner, parameters);
+                    overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+                }
+                wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
+                method_descriptors.emplace_back(fmt::format("meta_{}" , isCtorGrp ? "ctor" : overloadGroupName));
             }
         }
 
-        fold_range("methods", ownScope.inner, methods);
+        wrap_range_in_tuple("methods", ownScope.inner, method_descriptors);
     }
 
     void ReflectionDataGenerator::exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where) {
         auto qualName = Enum->getQualifiedNameAsString();
         auto name = Enum->getNameAsString();
 
-        auto ownScope = where.spawn(name, qualName);
+        auto ownScope = where.spawn(name, qualName, "mc::Enum");
         ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
+        ownScope.putline("using type = {};", qualName);
         std::vector<clang::EnumConstantDecl*> enumerators;
         for(const auto enumerator: Enum->enumerators()) {
             auto enName = enumerator->getNameAsString();
-            auto enScope = ownScope.spawn(enName, enumerator->getQualifiedNameAsString());
+            auto enScope = ownScope.spawn(enName, enumerator->getQualifiedNameAsString(), "mc::Enumerator");
             enScope.putline("static constexpr std::string_view name = \"{}\";", enName);
             enScope.putline("static constexpr int64_t value = {};", enumerator->getInitVal().getExtValue());
             enumerators.push_back(enumerator);
         }
 
-        fold_range("enumerators", ownScope.inner, enumerators);
+        wrap_range_in_tuple("enumerators", ownScope.inner, enumerators);
     }
 
     void ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
-        auto ownScope = where.spawn(name, qualName);
+        auto ownScope = where.spawn(name, qualName, "mc::Namespace");
         ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
         for(const auto decl: Namespace->decls()) {
             exportDeclaration(decl, ownScope);

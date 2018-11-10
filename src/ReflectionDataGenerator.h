@@ -55,10 +55,6 @@ struct scope {
         return scope(out, indentation+1);
     }
 
-    /*template <typename scopeK, typename ...scopeArgs>
-    scopeK spawn(scopeArgs&& ...args) const {
-        return scopeK(*this, std::forward<scopeArgs>(args)...);
-    }*/
 private:
     std::ostream &out;
 protected:
@@ -66,27 +62,21 @@ protected:
 };
 
 struct descriptor_scope {
-   /* descriptor_scope(const std::string &Name, const std::string &QualName, std::ostream& Out, int Indentation)
-        :ownScope(Out, Indentation),
-         name(Name),
-         qualName(QualName) {
-        putline("// descriptor for {}\n", qualName);
-        putline("struct {} {{\n", name);
-        ++indentation;
-    }*/
 
-    descriptor_scope(scope Outer, const std::string &Name, const std::string &QualName)
+    descriptor_scope(scope Outer, const std::string &Name, const std::string &QualName, const std::string &Kind)
         :outer(Outer),
          inner(outer.spawn()),
          name(Name),
-         qualName(QualName) {}
+         qualName(QualName),
+         kind(Kind) {}
 
     descriptor_scope(const descriptor_scope &other) = delete;
     descriptor_scope(descriptor_scope &&other)
         :outer(other.outer),
         inner(other.inner),
         name(std::move(other.name)),
-        qualName(std::move(other.qualName)) {
+        qualName(std::move(other.qualName)),
+        kind(std::move(other.kind)) {
         moved = true;
     }
 
@@ -97,9 +87,9 @@ struct descriptor_scope {
         }
     }
 
-    descriptor_scope spawn(const std::string& Name, const std::string& QualName) {
+    descriptor_scope spawn(const std::string& Name, const std::string& QualName, const std::string &Kind) {
         print_header();
-        return descriptor_scope(inner, Name, QualName);
+        return descriptor_scope(inner, Name, QualName, Kind);
     }
 
     template<typename ...Args>
@@ -117,19 +107,27 @@ struct descriptor_scope {
     void print_header() {
         if (!printed_header) {
             outer.putline("// descriptor for {}", qualName);
-            outer.putline("struct {} {{", name);
+            outer.putline("struct meta_{} : public {}<meta_{}> {{", name, kind, name);
             printed_header = true;
         }
     }
+
+    scope spawn() {
+        print_header();
+        return outer.spawn();
+    }
+
 
     scope outer;
     scope inner;
     const std::string name;
     const std::string qualName;
+    const std::string kind;
 private:
     bool moved = false;
     bool printed_header = false;
 };
+
 
     class ReflectionDataGenerator {
 
@@ -168,7 +166,7 @@ private:
         int nesting = 0;
 
         const clang::ASTContext &context;
-        const clang::PrintingPolicy &printingPolicy;
+        clang::PrintingPolicy printingPolicy;
     };
 
 

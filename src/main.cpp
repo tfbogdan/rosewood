@@ -16,11 +16,21 @@ llvm::cl::opt<std::string> mcOutput("o", llvm::cl::cat(mcOptionsCategory), llvm:
 llvm::cl::opt<std::string> mcModuleName("n", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("module name"));
 llvm::cl::opt<std::string> mcJsonOutput("j", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("json metadata output file"));
 
+// useful for debugging
+void printInvokation(int argc, const char **argv) {
+    fmt::print("Invocation: ");
+    for(int idx(0); idx < argc; ++idx) {
+        fmt::print("{} ", argv[idx]);
+    }
+    fmt::print("\n");
+}
 
 int main(int argc, const char **argv) {
     llvm::InitializeNativeTarget();
+    printInvokation(argc, argv);
 
     clang::tooling::CommonOptionsParser OptionsParser(argc, argv, mcOptionsCategory);
+
     clang::tooling::ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
 
     auto fact = new mc::ActionFactory();

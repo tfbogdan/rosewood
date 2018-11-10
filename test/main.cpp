@@ -5,19 +5,21 @@
 #include <iostream>
 #include <functional>
 
-template<typename MetaType>
-void printEnumerators([[maybe_unused]] MetaType metaType) {
-    using enumeratorsType = typename MetaType::enumerators;
-    std::cout << "enum " << MetaType::name << ":\n";
-    std::apply([](auto &&...vals){
-        ((std::cout << "  " << vals.name << ": " << vals.value << "\n"), ...);
-    }, enumeratorsType());
-}
-
 int main() {
-    printEnumerators(mc::Jinx::jinx::JinxTypes());
-    static_assert (mc::has_method(mc::Jinx::jinx::Jinx(), "aMethod"), "class jinx::Jinx should have a method called aMethod.");
-    static_assert (!mc::has_method(mc::Jinx::jinx::Jinx(), "fictionalMethod"), "class jinx::Jinx isn't support to have a method named fictionalMethod.");
+    using Jinx = mc::meta_Jinx::meta_jinx::meta_Jinx;
+    using JinxTypes = mc::meta_Jinx::meta_jinx::meta_JinxTypes;
+
+    constexpr Jinx jinx;
+    constexpr JinxTypes jinxTypes;
+
+    static_assert (jinx.has_method("aMethod"));
+    static_assert (!jinx.has_method("fictionalMethod"));
+    static_assert (!jinxTypes.in_range(-27));
+    static_assert (jinxTypes.in_range(-32));
+
+    jinxTypes.for_each_enumerator([](const auto &en){
+        std::cout << "  " << en.name << ": " << en.value << "\n";
+    });
 
     return 0;
 }
