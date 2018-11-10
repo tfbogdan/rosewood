@@ -145,7 +145,7 @@ namespace metal {
 }
 
 
-namespace meta {
+namespace mc {
 
     struct nil_t {};
     template <typename T>
@@ -169,7 +169,7 @@ namespace meta {
 
     template<typename T>
     bool constexpr has_method(std::string_view name) {
-        using meta_type = typename type_map<T>::meta_type;
+        using meta_type = T;
         using methods_tuple_type = typename meta_type::methods;
         bool found_method = false;
         std::apply([&name, &found_method](auto ...meth) {

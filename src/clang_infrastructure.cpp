@@ -26,11 +26,6 @@
 #include "MetaPreambleHeaderGenerator.h"
 
 namespace mc {
-    ActionFactory::ActionFactory() {
-    }
-
-    ActionFactory::~ActionFactory() {
-    }
 
     clang::FrontendAction *ActionFactory::create() {
         return new MetadataGenerateAction(mcContext);
@@ -43,7 +38,7 @@ namespace mc {
         Compiler.getPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts().UseStandardSystemIncludes = true;
         Compiler.getPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts().Verbose = true;
         */
-        return std::make_unique<MetadataTransformingConsumer>(InFile, mcContext, Compiler.getASTContext().getPrintingPolicy());
+        return std::make_unique<MetadataTransformingConsumer>(InFile, mcContext, Compiler.getASTContext());
     }
 
     bool MetadataGenerateAction::BeginInvocation(clang::CompilerInstance &CI) {
@@ -216,13 +211,13 @@ namespace mc {
         */
     }
 
-    MetadataTransformingConsumer::MetadataTransformingConsumer(llvm::StringRef iFile, mc::Context &mcContext, const clang::PrintingPolicy &pPolicy)
-        :visitor(pPolicy),
+    MetadataTransformingConsumer::MetadataTransformingConsumer(llvm::StringRef iFile, mc::Context &mcContext, const clang::ASTContext &context)
+        :generator(context),
         inputFile(iFile),
         mcContext(mcContext) {}
 
-    void MetadataTransformingConsumer::HandleTranslationUnit(clang::ASTContext &Context) {
-        visitor.TraverseTranslationUnitDecl(Context.getTranslationUnitDecl());
+    void MetadataTransformingConsumer::HandleTranslationUnit(clang::ASTContext &) {
+        generator.Generate();
     }
 
 }

@@ -18,9 +18,6 @@ namespace mc {
     class ActionFactory : public clang::tooling::FrontendActionFactory {
     public:
         clang::FrontendAction *create() override;
-        ActionFactory();
-        ~ActionFactory();
-
     private:
         mc::Context mcContext;
     };
@@ -45,11 +42,11 @@ namespace mc {
 
     class MetadataTransformingConsumer : public clang::ASTConsumer {
     public:
-        MetadataTransformingConsumer(llvm::StringRef iFile, mc::Context &mcContext, const clang::PrintingPolicy &pPolicy);
+        MetadataTransformingConsumer(llvm::StringRef iFile, mc::Context &mcContext, const clang::ASTContext &context);
         virtual void HandleTranslationUnit(clang::ASTContext &Context);
 
     private:
-        GeneratingASTVisitor visitor;
+        ReflectionDataGenerator generator;
         std::string inputFile;
         std::vector<std::shared_ptr<mc::CodeGeneratorBase>> generators;
 

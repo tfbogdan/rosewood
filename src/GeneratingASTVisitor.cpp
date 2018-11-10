@@ -7,7 +7,6 @@
 #include <experimental/filesystem>
 
 #pragma warning(push, 0)
-#include <llvm/Support/CommandLine.h>
 #pragma warning(pop)
 
 extern llvm::cl::opt<std::string> mcOutput;
@@ -32,68 +31,197 @@ static const std::unordered_map<clang::BuiltinType::Kind, std::string_view> buil
     { clang::BuiltinType::Kind::Bool, "BK_Bool"}
 };
 
+#define putname ownScope.putline("static constexpr std::string_view name = \"{}\";", name)
+
 namespace mc {
     namespace fs = std::experimental::filesystem;
 
-    GeneratingASTVisitor::GeneratingASTVisitor(const clang::PrintingPolicy &pPolicy)
+
+    ReflectionDataGenerator::ReflectionDataGenerator(const clang::ASTContext &astContext)
         :out(mcOutput),
-        idman(pPolicy),
+        idman(astContext.getPrintingPolicy()),
         idrepo(),
-        printingPolicy(pPolicy) {
+        context(astContext),
+        printingPolicy(astContext.getPrintingPolicy()) {
 
-        out << "#include <mc/MetaType.h>\n";
+        global_scope.putline("#pragma once");
+        global_scope.putline("#include <string_view>");
+        global_scope.putline("#include <tuple>");
+        global_scope.putline("");
+        global_scope.putline("namespace mc {{");
     }
 
-    GeneratingASTVisitor::~GeneratingASTVisitor() {
+    ReflectionDataGenerator::~ReflectionDataGenerator() {
+        global_scope.putline("}} //::mc");
         idrepo.save(mcJsonOutput.getValue());
+        out.flush();
     }
 
-    
-    bool GeneratingASTVisitor::VisitCXXRecordDecl(const clang::CXXRecordDecl *record) {
-        const bool inMainFile(record->getASTContext().getSourceManager().isInMainFile(record->getLocation()));
+    void ReflectionDataGenerator::Generate() {
+        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue());
 
-        if (inMainFile && record->isThisDeclarationADefinition()) {
-            for(const auto method: record->methods()) {
-                if (method->getAccess() == clang::AccessSpecifier::AS_public) {
-                    genTypeDescriptor(method->getReturnType().getTypePtr());
-                    for(const auto arg: method->parameters()) {
-                        genTypeDescriptor(arg->getType().getTypePtr());
-                    }
+        for(const auto decl: context.getTranslationUnitDecl()->decls()) {
+            // first cull out everything that isn't defined withing the `main` file
+            const bool inMainFile(context.getSourceManager().isInMainFile(decl->getLocation()));
+            if (inMainFile) {
+                exportDeclaration(decl, module_scope);
+            }
+        }
+    }
+
+    void ReflectionDataGenerator::exportDeclaration(const clang::Decl *Decl, descriptor_scope &where) {
+        // so this is a sort of a type dispatcher
+        switch(auto declKind = Decl->getKind()) {
+        case clang::Decl::Kind::Namespace:
+            exportNamespace(static_cast<const clang::NamespaceDecl*>(Decl), where);
+            break;
+        case clang::Decl::Kind::Enum:
+            exportEnum(static_cast<const clang::EnumDecl*>(Decl), where);
+            break;
+        case clang::Decl::Kind::CXXRecord: {
+            auto record = static_cast<const clang::CXXRecordDecl*>(Decl);
+            if (record->isThisDeclarationADefinition()) {
+                exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(Decl), where);
+            }
+        } break;
+        case clang::Decl::Kind::CXXConstructor: {
+            exportCxxConstructor(static_cast<const clang::CXXConstructorDecl*>(Decl), where);
+        } break;
+        case clang::Decl::Kind::CXXMethod: {
+            exportCxxMethod(static_cast<const clang::CXXMethodDecl*>(Decl), where);
+        }break;
+        default:
+            break;
+        }
+    }
+
+
+    void ReflectionDataGenerator::exportCxxMethod(const clang::CXXMethodDecl *Method, descriptor_scope &where) {
+        if (!Method->isOverloadedOperator()) {
+            auto qualName = Method->getQualifiedNameAsString();
+            auto name = Method->getNameAsString();
+            auto ownScope = where.spawn(name, qualName);
+            putname;
+            ownScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
+            std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
+            for (const auto param: parameters) {
+                auto parmName = param->getNameAsString();
+                auto paramScope = ownScope.spawn(parmName, parmName);
+                paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
+                ownScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+            }
+
+            const std::size_t numParams = parameters.size();
+            ownScope.putline("using parameters = std::tuple<");
+            auto initScope = ownScope.inner.spawn();
+            for(std::size_t idx(0); idx < numParams; ++idx) {
+                const auto& parameter = parameters[idx];
+                auto parmName = parameter->getNameAsString();
+                initScope.indent();
+                initScope.rawput(parmName);
+                if (idx < (numParams - 1)) {
+                    initScope.rawput(",");
                 }
+                initScope.rawput("\n");
+            }
+
+            ownScope.putline(">;");
+        }
+    }
+
+    void ReflectionDataGenerator::exportCxxConstructor(const clang::CXXConstructorDecl *, descriptor_scope &) {
+        /// whelp... all ctors have the same names so we need to come up with an overloading mechanism
+        /// but that can get a bit hairy for let's skip this till we're done with the simple stuff
+    }
+
+    template <typename declRangeT>
+    void fold_range(std::string_view withName, scope where, const declRangeT &range) {
+        const std::size_t numElements = std::size(range);
+        if (numElements == 0) {
+            where.putline("using {} = std::tuple<>;", withName);
+            return;
+        }
+
+        where.putline("using {} = std::tuple<", withName);
+        auto initScope = where.spawn();
+
+        for(std::size_t idx(0); idx < numElements; ++idx) {
+            const auto& item = range[idx];
+            auto itemName = item->getNameAsString();
+            initScope.indent();
+            initScope.rawput(itemName);
+            if (idx < (numElements - 1)) {
+                initScope.rawput(",");
+            }
+            initScope.rawput("\n");
+        }
+        where.putline(">;");
+    }
+
+    void ReflectionDataGenerator::exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where) {
+        auto qualName = Record->getQualifiedNameAsString();
+        auto name = Record->getNameAsString();
+        auto ownScope = where.spawn(name, qualName);
+
+        std::vector<const clang::CXXMethodDecl*> methods;
+
+        for(const auto Method: Record->methods()) {
+            const bool isCtor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
+            const bool overloadedOperator = Method->isOverloadedOperator();
+
+            // this captures constructors too so skip those
+            if (!overloadedOperator && !isCtor) {
+                auto methodQualName = Method->getQualifiedNameAsString();
+                auto methodName = Method->getNameAsString();
+                auto methodScope = ownScope.spawn(methodName, methodQualName);
+                methodScope.putline("static constexpr std::string_view name = \"{}\";", methodName);
+
+                methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
+
+                std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
+                for (const auto param: parameters) {
+                    auto parmName = param->getNameAsString();
+                    auto paramScope = methodScope.spawn(parmName, parmName);
+                    paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
+                    methodScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+                }
+                fold_range("parameters", methodScope.inner, parameters);
+                methods.push_back(Method);
             }
         }
 
-        return true;
+        fold_range("methods", ownScope.inner, methods);
     }
 
-    bool GeneratingASTVisitor::VisitEnumDecl(const clang::EnumDecl *Enum) {
-        if (exportDeclaration(Enum)) {
-            exportedEnums.push_back(Enum);
+    void ReflectionDataGenerator::exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where) {
+        auto qualName = Enum->getQualifiedNameAsString();
+        auto name = Enum->getNameAsString();
+
+        auto ownScope = where.spawn(name, qualName);
+        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
+        std::vector<clang::EnumConstantDecl*> enumerators;
+        for(const auto enumerator: Enum->enumerators()) {
+            auto enName = enumerator->getNameAsString();
+            auto enScope = ownScope.spawn(enName, enumerator->getQualifiedNameAsString());
+            enScope.putline("static constexpr std::string_view name = \"{}\";", enName);
+            enScope.putline("static constexpr int64_t value = {};", enumerator->getInitVal().getExtValue());
+            enumerators.push_back(enumerator);
         }
-        return true;
+
+        fold_range("enumerators", ownScope.inner, enumerators);
     }
 
-    bool GeneratingASTVisitor::VisitCXXMethodDecl(const clang::CXXMethodDecl *) {
-        // only deals with filtering methods from functions
-        // methods are already handled in the context of their classes
-        return true;
-    }
-
-    bool GeneratingASTVisitor::VisitFunctionDecl(const clang::FunctionDecl *Function) {
-        if (exportDeclaration(Function)) {
-            exportedFunctions.push_back(Function);
+    void ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
+        auto qualName = Namespace->getQualifiedNameAsString();
+        auto name = Namespace->getNameAsString();
+        auto ownScope = where.spawn(name, qualName);
+        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
+        for(const auto decl: Namespace->decls()) {
+            exportDeclaration(decl, ownScope);
         }
-        return true;
     }
 
-    bool GeneratingASTVisitor::exportDeclaration(const clang::Decl *Decl) {
-        bool isInMainFile(Decl->getASTContext().getSourceManager().isInMainFile(Decl->getLocation()));
-        // for now, everything that is in a file parsed explicitly is exported.
-        // this should be extended to skip stuff defined in an internal namespace
-        return isInMainFile;
-    }
-
-    void GeneratingASTVisitor::genTypeDescriptor(const clang::Type *ty) {
+    void ReflectionDataGenerator::genTypeDescriptor(const clang::Type *ty) {
         return;
         auto identifier = idman.id(ty);
 

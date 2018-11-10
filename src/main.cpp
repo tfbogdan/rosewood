@@ -13,18 +13,19 @@
 
 llvm::cl::OptionCategory mcOptionsCategory("mc options");
 llvm::cl::opt<std::string> mcOutput("o", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("cpp metadata output file"));
+llvm::cl::opt<std::string> mcModuleName("n", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("module name"));
 llvm::cl::opt<std::string> mcJsonOutput("j", llvm::cl::cat(mcOptionsCategory), llvm::cl::Required, llvm::cl::desc("json metadata output file"));
 
 
 int main(int argc, const char **argv) {
 
     std::vector<std::string> args;
-    //fmt::printf("Invocation: ");
+    fmt::printf("Invocation: ");
     for(unsigned argi(0); argi < argc; ++argi) {
         args.push_back(argv[argi]);
-        //fmt::printf("%s ", argv[argi]);
+        fmt::printf("%s ", argv[argi]);
     }
-	//fmt::printf("\n");
+    fmt::printf("\n");
 
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86TargetMC();
