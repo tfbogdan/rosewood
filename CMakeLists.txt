@@ -17,6 +17,7 @@ conan_cmake_run(CONANFILE conanfile.txt
 include(cmake/mc.cmake)
 add_subdirectory(lib)
 add_subdirectory(src)
+add_subdirectory(test)
 
 
 install(EXPORT mc DESTINATION lib/cmake/mc NAMESPACE mc)

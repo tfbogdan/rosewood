@@ -168,9 +168,10 @@ namespace mc {
         for(const auto Method: Record->methods()) {
             const bool isCtor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
             const bool overloadedOperator = Method->isOverloadedOperator();
+            const bool isDtor = Method->getKind() == clang::Decl::Kind::CXXDestructor;
 
             // this captures constructors too so skip those
-            if (!overloadedOperator && !isCtor) {
+            if (!overloadedOperator && !isCtor && !isDtor) {
                 auto methodQualName = Method->getQualifiedNameAsString();
                 auto methodName = Method->getNameAsString();
                 auto methodScope = ownScope.spawn(methodName, methodQualName);

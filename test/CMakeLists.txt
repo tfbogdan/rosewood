@@ -1,0 +1,7 @@
+include(CTest)
+
+if (BUILD_TESTING)
+    add_executable(mc_test Jinx.cpp main.cpp)
+    metacompile_header(mc_test Jinx.h)
+    target_link_libraries(mc_test PRIVATE mcruntime)
+endif(BUILD_TESTING)

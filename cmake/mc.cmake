@@ -18,7 +18,8 @@ function(metacompile_header target headerFile)
 		IMPLICIT_DEPENDS CXX ${CMAKE_CURRENT_SOURCE_DIR}/${headerFile}
 		COMMAND_EXPAND_LISTS
 	)
-	target_sources(${target} PRIVATE ${outputCXXFile} ${outputJsonFile})
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${headerFile} ${outputCXXFile} ${outputJsonFile})
+        target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 	set_property(TARGET ${target} APPEND PROPERTY MC_METADATA_FILES ${outputJsonFile})
 endfunction()
 

@@ -167,9 +167,9 @@ namespace mc {
         return T::name == name;
     }
 
-    template<typename T>
-    bool constexpr has_method(std::string_view name) {
-        using meta_type = T;
+    template<typename MetaType>
+    bool constexpr has_method([[maybe_unused]] MetaType metaType, std::string_view name) {
+        using meta_type = MetaType;
         using methods_tuple_type = typename meta_type::methods;
         bool found_method = false;
         std::apply([&name, &found_method](auto ...meth) {
