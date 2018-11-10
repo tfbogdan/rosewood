@@ -18,45 +18,11 @@ llvm::cl::opt<std::string> mcJsonOutput("j", llvm::cl::cat(mcOptionsCategory), l
 
 
 int main(int argc, const char **argv) {
-
-    std::vector<std::string> args;
-    fmt::printf("Invocation: ");
-    for(unsigned argi(0); argi < argc; ++argi) {
-        args.push_back(argv[argi]);
-        fmt::printf("%s ", argv[argi]);
-    }
-    fmt::printf("\n");
-
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmParser();
 
-    args.push_back("-xc++");
-    // args.push_back("-std=c++17");
-    // args.push_back("-E");
-    // args.push_back("-v");
-    // args.push_back("-");
-    // args.push_back("--gcc-toolchain");
-
-    std::vector<const char *> argvv;
-    for(unsigned argi(0); argi < argc; ++argi) {
-        // argvv.push_back(argv[argi]);
-    } 
-    for(const auto &a: args) {
-        argvv.push_back(a.c_str());
-    }
-    int argcc(argvv.size());
-
-    clang::tooling::CommonOptionsParser OptionsParser(argcc, argvv.data(), mcOptionsCategory);
-    
-    if (OptionsParser.getSourcePathList().size() > 1) {
-        // TDO: differentiate better between a `link` and `compile` operation. Right now, just generate the output files
-        std::ofstream oFile(mcOutput);
-        oFile << "\n";
-        std::ofstream oJson(mcJsonOutput);
-        oJson << "\n";
-        return 0;
-    }
+    clang::tooling::CommonOptionsParser OptionsParser(argc, argv, mcOptionsCategory);
     clang::tooling::ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
 
     auto fact = new mc::ActionFactory();
