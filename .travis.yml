@@ -1,25 +1,46 @@
+dist: trusty
+sudo: require
 language: cpp
-script: cmake
+
+addons:
+  apt: 
+    - sources:
+      - ubuntu-toolchain-r-test
+      - universe
+    - packages:
+      - gcc-7
+      - g++-7
+      - python3-pip
+      - curl
+      - software-properties-common
+      - cmake
+
+
 before_install:
   - sudo apt-get update
-  - sudo apt-get install -y software-properties-common
-  - sudo apt-add-repository universe
-  - sudo add-apt-repository -y ppa:jonathonf/gcc-7.3
-  - sudo apt-get update
 
-  - sudo apt-get install -y python3-pip curl
-
-  - mkdir ~/llvm
-  - cd ~/llvm
-  - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
-  - tar xf llvm.tar.xz --strip 1
 
   - sudo pip install conan
-  - sudo apt-get install -y gcc-7 g++-7
+
 before_script:
   - mkdir build
   - cd build
   - cmake ..
-script: make
+
+script: 
+  - ln -s /usr/bin/gcc-6 /usr/local/bin/gcc
+  - ln -s /usr/bin/g++-6 /usr/local/bin/g++
+
+  - mkdir ~/llvm
+  - cd ~/llvm
+  - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
+  - tar xvf llvm.tar.xz --strip 1 # keep the v. makes debugging builds easier
+  - cd ..
+  - export Clang_DIR=./llvm/lib/cmake/clang
+  
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make
 
 

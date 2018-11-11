@@ -9,8 +9,8 @@ target_include_directories(mcruntime
 
 target_compile_features(mcruntime INTERFACE cxx_std_17)
 
-install(DIRECTORY ${CLANG_CMAKE_DIR}/../../clang/7.0.1/include DESTINATION lib/clang/7.0.1/include)
-file(COPY ${CLANG_CMAKE_DIR}/../../clang/7.0.1/include DESTINATION clang/7.0.1)
+install(DIRECTORY ${CLANG_CMAKE_DIR}/../../clang/${LLVM_PACKAGE_VERSION}/include DESTINATION lib/clang/${LLVM_PACKAGE_VERSION}/include)
+file(COPY ${CLANG_CMAKE_DIR}/../../clang/${LLVM_PACKAGE_VERSION}/include DESTINATION clang/${LLVM_PACKAGE_VERSION})
 
 install(
     DIRECTORY ${PROJECT_SOURCE_DIR}/include
