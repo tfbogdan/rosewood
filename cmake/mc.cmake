@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.9)
 
 function(metacompile_header target headerFile)
 	get_target_property(TGT_INCLUDE_DIRS ${target} INCLUDE_DIRECTORIES)
