@@ -27,11 +27,12 @@ script:
   - cd ..
   - export Clang_DIR=./llvm/lib/cmake/clang
 
-  - cd build
   - export CC=gcc-7
   - export CXX=g++-7
   - cmake --version
   - cd $TRAVIS_BUILD_DIR
+  - mkdir build
+  - cd build
   - cmake -DCMAKE_BUILD_TYPE=Release ..
   - make
   - ./bin/mc_test
