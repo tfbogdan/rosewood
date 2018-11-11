@@ -1,20 +1,21 @@
+sudo: required
+dist: trusty
 language: cpp
 compiler: gcc
 
 addons:
-  apt: 
-    - sources:
-      - ubuntu-toolchain-r-test
-    - packages:
-      - gcc-7
-      - g++-7
-      - curl
-      - cmake
-
-before_install:
-  - sudo pip install conan
+  apt:
+    update: true
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-7
+    - g++-7
+    - curl
+    - cmake
 
 script: 
+  - sudo pip install conan
   - mkdir ~/llvm
   - cd ~/llvm
   - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
