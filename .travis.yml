@@ -32,7 +32,7 @@ script:
   - export CXX=g++-7
   - cmake --version
   - cd $TRAVIS_BUILD_DIR
-  - cmake-DCMAKE_BUILD_TYPE=Release ..
+  - cmake -DCMAKE_BUILD_TYPE=Release ..
   - make
   - ./bin/mc_test
 
