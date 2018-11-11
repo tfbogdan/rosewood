@@ -69,12 +69,13 @@ protected:
 
 struct descriptor_scope {
 
-    descriptor_scope(scope Outer, const std::string &Name, const std::string &QualName, const std::string &Kind)
+    descriptor_scope(scope Outer, const std::string &Name, const std::string &QualName, const std::string &Kind, const std::string &parentQualName = "")
         :outer(Outer),
          inner(outer.spawn()),
          name(Name),
          qualName(QualName),
-         kind(Kind) {}
+         kind(Kind),
+         qualifiedName(fmt::format("{}::meta_{}", parentQualName.empty() ? "mc" : parentQualName, Name)) {}
 
     descriptor_scope(const descriptor_scope &other) = delete;
     descriptor_scope(descriptor_scope &&other)
@@ -82,12 +83,13 @@ struct descriptor_scope {
         inner(other.inner),
         name(std::move(other.name)),
         qualName(std::move(other.qualName)),
-        kind(std::move(other.kind)) {
+        kind(std::move(other.kind)),
+        qualifiedName(std::move(other.kind)){
         moved = true;
     }
 
     ~descriptor_scope() {
-        if (!moved) {
+        if (!name.empty()) {
             print_header();
             outer.putline("}};", name);
         }
@@ -95,7 +97,7 @@ struct descriptor_scope {
 
     descriptor_scope spawn(const std::string& Name, const std::string& QualName, const std::string &Kind) {
         print_header();
-        return descriptor_scope(inner, Name, QualName, Kind);
+        return descriptor_scope(inner, Name, QualName, Kind, qualifiedName);
     }
 
     template<typename ...Args>
@@ -111,7 +113,7 @@ struct descriptor_scope {
     }
 
     void print_header() {
-        if (!printed_header) {
+        if (!printed_header && !name.empty()) {
             outer.putline("struct meta_{} : public {}<meta_{}> {{", name, kind, name);
             inner.putline("static constexpr std::string_view name = \"{}\";", name);
             printed_header = true;
@@ -123,12 +125,12 @@ struct descriptor_scope {
         return outer.spawn();
     }
 
-
     scope outer;
     scope inner;
     const std::string name;
     const std::string qualName;
     const std::string kind;
+    const std::string qualifiedName; // holds a path that leads to this descriptor from the global namespace
 private:
     bool moved = false;
     bool printed_header = false;
@@ -143,25 +145,23 @@ private:
 
         void Generate();
 
-        std::vector<const clang::CXXRecordDecl*>    exportedRecords;
-        std::vector<const clang::EnumDecl*>         exportedEnums;
-        std::vector<const clang::FunctionDecl*>     exportedFunctions;
-
     private:
-        void exportDeclaration(const clang::Decl *Decl, descriptor_scope &where);
-        void exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where);
-        void exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where);
-        void exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where);
-        void exportCxxConstructor(const clang::CXXConstructorDecl *Ctor, descriptor_scope &where);
-        void exportCxxMethod(const clang::CXXMethodDecl *Method, descriptor_scope &where);
+        descriptor_scope exportDeclaration(const clang::Decl *Decl, descriptor_scope &where);
 
-        void genTypeDescriptor(const clang::Type *ty);
+        descriptor_scope exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where);
+        descriptor_scope exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where);
+        descriptor_scope exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where);
+
+        descriptor_scope exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &where);
+        descriptor_scope exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
+        descriptor_scope exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
+        descriptor_scope exportCxxStaticOperator(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where);
+        descriptor_scope exportFunctions(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where);
+        descriptor_scope exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &where);
+        descriptor_scope exportCxxDestructor(const clang::CXXDestructorDecl *Dtor, const clang::CXXRecordDecl *record, descriptor_scope &where);
+        void exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &where);
+
         void genMethodCallUnpacker(const clang::CXXMethodDecl *method);
-        void genMethodArgDescriptorList(const clang::CXXMethodDecl *method);
-        void genMethodDescriptor(const clang::CXXMethodDecl *method);
-        void genRecordDescriptor(const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &exportedMethods);
-        void genRecordMethodDescriptorList(const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &exportedMethods);
-        void genRecordDescBindingToVirtualFcn(const clang::CXXRecordDecl *record);
 
         std::ofstream out;
         mc::IdentifierHelper idman;
@@ -169,7 +169,7 @@ private:
 
         scope global_scope = scope(out, 0);
 
-        int nesting = 0;
+        std::vector<std::tuple<std::string, std::string>> exportedMetaTypes; // all enums and classes get one of these. more to come
 
         const clang::ASTContext &context;
         clang::PrintingPolicy printingPolicy;
@@ -177,3 +177,4 @@ private:
 
 
 }
+

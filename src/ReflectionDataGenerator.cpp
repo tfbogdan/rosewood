@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <experimental/filesystem>
+#include <clang/Basic/OperatorKinds.h>
 
 #include <iostream>
 
@@ -59,6 +60,14 @@ namespace mc {
     }
 
     ReflectionDataGenerator::~ReflectionDataGenerator() {
+        for(const auto &[declName, descriptorName]: exportedMetaTypes) {
+            global_scope.putline("template <>");
+            global_scope.putline("struct meta <{}> {{", declName);
+            auto inner_scope = global_scope.spawn();
+            inner_scope.putline("using type = {};", descriptorName);
+            global_scope.putline("}};");
+        }
+
         global_scope.putline("}}");
         idrepo.save(mcJsonOutput.getValue());
         out.flush();
@@ -77,70 +86,26 @@ namespace mc {
         }
     }
 
-    void ReflectionDataGenerator::exportDeclaration(const clang::Decl *Decl, descriptor_scope &where) {
+    descriptor_scope ReflectionDataGenerator::exportDeclaration(const clang::Decl *Decl, descriptor_scope &where) {
         // so this is a sort of a type dispatcher
         switch(auto declKind = Decl->getKind()) {
         case clang::Decl::Kind::Namespace:
-            exportNamespace(static_cast<const clang::NamespaceDecl*>(Decl), where);
-            break;
+            return exportNamespace(static_cast<const clang::NamespaceDecl*>(Decl), where);
         case clang::Decl::Kind::Enum:
-            exportEnum(static_cast<const clang::EnumDecl*>(Decl), where);
-            break;
+            return exportEnum(static_cast<const clang::EnumDecl*>(Decl), where);
         case clang::Decl::Kind::CXXRecord: {
             auto record = static_cast<const clang::CXXRecordDecl*>(Decl);
             if (record->isThisDeclarationADefinition()) {
-                exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(Decl), where);
+                return exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(Decl), where);
             }
         } break;
-        case clang::Decl::Kind::CXXConstructor: {
-            exportCxxConstructor(static_cast<const clang::CXXConstructorDecl*>(Decl), where);
-        } break;
-        case clang::Decl::Kind::CXXMethod: {
-            exportCxxMethod(static_cast<const clang::CXXMethodDecl*>(Decl), where);
-        }break;
         default:
             break;
         }
+        // TDO: Once we have better coverage of declaration types, this should become a throw
+        return where.spawn("", "", "");
     }
 
-
-    void ReflectionDataGenerator::exportCxxMethod(const clang::CXXMethodDecl *Method, descriptor_scope &where) {
-        if (!Method->isOverloadedOperator()) {
-            auto qualName = Method->getQualifiedNameAsString();
-            auto name = Method->getNameAsString();
-            auto ownScope = where.spawn(name, qualName, "mc::Method");
-            putname;
-            ownScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
-            std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
-            for (const auto param: parameters) {
-                auto parmName = param->getNameAsString();
-                auto paramScope = ownScope.spawn(parmName, parmName, "mc::Parameter");
-                paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
-                ownScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
-            }
-
-            const std::size_t numParams = parameters.size();
-            ownScope.putline("using parameters = std::tuple<");
-            auto initScope = ownScope.inner.spawn();
-            for(std::size_t idx(0); idx < numParams; ++idx) {
-                const auto& parameter = parameters[idx];
-                auto parmName = parameter->getNameAsString();
-                initScope.indent();
-                initScope.rawput(parmName);
-                if (idx < (numParams - 1)) {
-                    initScope.rawput(",");
-                }
-                initScope.rawput("\n");
-            }
-
-            ownScope.putline(">;");
-        }
-    }
-
-    void ReflectionDataGenerator::exportCxxConstructor(const clang::CXXConstructorDecl *, descriptor_scope &) {
-        /// whelp... all ctors have the same names so we need to come up with an overloading mechanism
-        /// but that can get a bit hairy for let's skip this till we're done with the simple stuff
-    }
 
     template <typename declRangeT>
     void wrap_range_in_tuple(std::string_view withName, scope where, const declRangeT &range) {
@@ -156,7 +121,7 @@ namespace mc {
         for(std::size_t idx(0); idx < numElements; ++idx) {
             const auto& item = range[idx];
             initScope.indent();
-            if constexpr (std::is_same<std::string, typename declRangeT::value_type>::value) {
+            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
                 initScope.rawput(item);
             } else {
                 auto itemName = item->getNameAsString();
@@ -173,47 +138,143 @@ namespace mc {
     void genMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
         // this should be more elaborate and should consider all method attributes ( is const for example )
         descScope.putline("static constexpr auto call = [] (");
-        scope argList = descScope.inner.spawn().spawn();
+
+        scope argList = descScope.inner.spawn();
         const std::size_t numArgs = Method->param_size();
         const bool isConstructor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
-        const bool isImplicit = isConstructor ? static_cast<const clang::CXXConstructorDecl*>(Method)->isImplicit() : false;
-
+        const bool isImplicit = Method->isImplicit();
         if (isConstructor) {
-            argList.putline("void *addr{}", numArgs > 0 ? ",": "");
+            argList.putline("void *addr{}", numArgs > 0 ? ",": ") {");
         } else {
-            argList.putline("{}{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": "");
+            argList.putline("{}{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": ") {");
         }
 
         std::size_t index(0);
         for (const auto arg: Method->parameters()) {
-            argList.putline("{} {}{}", arg->getType().getAsString(Method->getASTContext().getPrintingPolicy()),  isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            argList.putline("{} {}{}", arg->getType().getAsString(Method->getASTContext().getPrintingPolicy()),  isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": ") {");
             ++index;
         }
-        descScope.putline(") {{");
+        auto lambdaBody = argList.spawn();
+
         if (isConstructor) {
-            argList.putline("new (addr) {} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
+            lambdaBody.putline("new (addr) {} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
         } else {
-            argList.putline("return obj.{} (", Method->getNameAsString());
+            lambdaBody.putline("return obj.{} ({}", Method->getNameAsString(), numArgs > 0 ? "" : ");");
         }
-        auto callArgList = argList.spawn().spawn();
+        auto callArgList = lambdaBody.spawn();
         index = 0;
         for (const auto arg: Method->parameters()) {
-            callArgList.putline("{} {}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            if (arg->getType()->isRValueReferenceType()) {
+                callArgList.putline("std::move({}){}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            } else {
+                callArgList.putline("{}{}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
+            }
             ++index;
         }
-        descScope.putline("{}}};", isConstructor ? (numArgs > 0 ? ");" : "") : ");");
-
-        // const ::{0}, args...) { return ::{1}};", Record->getQualifiedNameAsString(), Method->getQualifiedNameAsString());
+        if (numArgs > 0) {
+            lambdaBody.putline(");");
+        }
+        descScope.putline("}};");
     }
 
-    void ReflectionDataGenerator::exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where) {
+
+    descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
+        const auto methodQualName = method->getQualifiedNameAsString();
+
+        auto methodScope = outerScope.spawn(name, methodQualName, "mc::Method");
+        genMethodDispatcher(methodScope, method, record);
+        methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
+
+        std::vector<std::string> parameters;
+        for (const auto param: method->parameters()) {
+            auto parmName = (param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
+            auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
+            paramScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+            parameters.emplace_back(fmt::format("meta_{}", parmName));
+        }
+        wrap_range_in_tuple("parameters", methodScope.inner, parameters);
+        return methodScope;
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
+        // the unwanted methods have already been filtered out at this point so it's just a straightforward export
+        const auto methodQualName = overloads[0]->getQualifiedNameAsString();
+        auto overloadScope = outerScope.spawn(name, methodQualName, "mc::OverloadSet");
+
+        std::vector<std::string> overloadNames;
+
+        for(const auto Method: overloads) {
+            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
+            exportCxxMethod(overloadName, Record, Method, overloadScope);
+            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+        }
+        wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
+        return overloadScope;
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
+        const auto qualName = overloads[0]->getQualifiedNameAsString();
+        auto opScope = outerScope.spawn(name, qualName, "mc::Operator");
+
+        std::vector<std::string> overloadNames;
+
+        for(const auto Method: overloads) {
+            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
+            auto overloadScope = exportCxxMethod(overloadName, record, Method, opScope);
+            const auto spelling = clang::getOperatorSpelling(Method->getOverloadedOperator());
+            overloadScope.putline("static constexpr std::string_view spelling = \"{}\";", spelling);
+            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+        }
+        wrap_range_in_tuple("overloads", opScope.inner, overloadNames);
+
+        return opScope;
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where) {
+
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where) {
+
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
+        const auto methodQualName = overloads[0]->getQualifiedNameAsString();
+        static const std::string name = "constructor";
+        auto overloadScope = outerScope.spawn(name, methodQualName, "mc::ConstructorSet");
+
+        std::vector<std::string> overloadNames;
+
+        for(const auto Method: overloads) {
+            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
+            exportCxxMethod(overloadName, record, Method, overloadScope);
+            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+        }
+        wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
+        return overloadScope;
+    }
+
+    descriptor_scope ReflectionDataGenerator::exportCxxDestructor(const clang::CXXDestructorDecl *Dtor, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
+        return exportCxxMethod("destructor", record, Dtor, outerScope);
+    }
+
+    void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
+        for(const auto& field: fields) {
+            auto fieldScope = outerScope.spawn(field->getNameAsString(), field->getQualifiedNameAsString(), "mc::Field");
+            fieldScope.putline("using type = {};", field->getType().getAsString(printingPolicy));
+        }
+    }
+
+
+    descriptor_scope ReflectionDataGenerator::exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where) {
         auto qualName = Record->getQualifiedNameAsString();
         auto name = Record->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Class");
         ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
-        std::vector<std::string> method_descriptors;
+        std::map<std::string_view, std::vector<std::string>> descriptornames;
+
         // in order to do overloading we need to do three passes over all methods
-        std::map<llvm::StringRef, std::vector<const clang::CXXMethodDecl*>> method_groups;
+        std::map<std::string, std::vector<const clang::CXXMethodDecl*>> method_groups;
         std::map<std::string, std::vector<const clang::CXXMethodDecl*>> overloaded_operators;
         // std::map<llvm::StringRef, std::vector<const clang::FunctionDecl*>> function_groups;
         // std::map<std::string, std::vector<const clang::FunctionDecl*>> static_operator_groups;
@@ -221,7 +282,7 @@ namespace mc {
         std::vector<const clang::CXXConversionDecl*> conversions;
         std::vector<const clang::FieldDecl*> fields;
         std::vector<const clang::Decl*> decls;
-        const clang::CXXDestructorDecl *destructor;
+        const clang::CXXDestructorDecl *destructor = nullptr;
 
         for(const auto decl: Record->decls()) {
             // first trim out non public members
@@ -231,7 +292,13 @@ namespace mc {
                 auto method = static_cast<const clang::CXXMethodDecl*>(decl);
                 // TDO: the other half
                 if (!method->isOverloadedOperator()) {
-                    method_groups[method->getName()].push_back(method);
+                    const auto methodName = method->getNameAsString();
+                    method_groups[methodName].push_back(method);
+                    descriptornames["methods"].emplace_back(fmt::format("meta_{}", methodName));
+                } else {
+                    const auto opName = fmt::format("operator_{}", overloaded_operators.size());
+                    overloaded_operators[opName].push_back(method);
+                    descriptornames["operators"].emplace_back(fmt::format("meta_{}", opName));
                 }
             } break;
             case clang::Decl::Kind::CXXConstructor: {
@@ -245,74 +312,47 @@ namespace mc {
                 auto conv = static_cast<const clang::CXXConversionDecl*>(decl);
                 conversions.push_back(conv);
             } break;
-            case clang::Decl::Kind::Field: {} break;
+            case clang::Decl::Kind::Field: {
+                auto field = static_cast<const clang::FieldDecl*>(decl);
+                fields.push_back(field);
+                descriptornames["fields"].emplace_back(fmt::format("meta_{}", field->getNameAsString()));
+            } break;
             default:
                 decls.push_back(decl);
                 break;
             }
         }
 
-        for(const auto& [overloadGroupName, overloads]: method_groups) {
-            if(overloads.size() == 1u) {
-                const auto Method = overloads[0];
-                const bool isCtor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
-                const bool overloadedOperator = Method->isOverloadedOperator();
-                const bool isDtor = Method->getKind() == clang::Decl::Kind::CXXDestructor;
-                const auto methodQualName = Method->getQualifiedNameAsString();
+        exportCxxConstructors(constructors, Record, ownScope);
+        for(const auto &[grpName, grp]: method_groups) {
+            exportCxxMethodGroup(grpName, Record, grp, ownScope);
+        }
 
-                if (!overloadedOperator && !isCtor && !isDtor) {
-                    auto methodScope = ownScope.spawn(overloadGroupName, methodQualName, "mc::Method");
-                    genMethodDispatcher(methodScope, Method, Record);
-                    methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
+        for(const auto &[opName, opGrp]: overloaded_operators) {
+            exportCxxOperator(opName, Record, opGrp, ownScope);
+        }
 
-                    std::vector<clang::ParmVarDecl*> parameters(Method->parameters());
-                    for (const auto param: parameters) {
-                        auto parmName = param->getNameAsString();
-                        auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
-                        methodScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
-                    }
-                    wrap_range_in_tuple("parameters", methodScope.inner, parameters);
-                    method_descriptors.emplace_back(fmt::format("meta_{}", Method->getNameAsString()));
-                }
-            } else {
-                const bool isCtorGrp = overloadGroupName == name;
-                const auto methodQualName = overloads[0]->getQualifiedNameAsString();
-                auto overloadScope = ownScope.spawn(isCtorGrp ? "ctor" : overloadGroupName, methodQualName, "mc::OverloadSet");
-                std::vector<std::string> overloadNames;
+        exportFields(fields, ownScope);
+        if (destructor != nullptr) exportCxxDestructor(destructor, Record, ownScope);
 
-                for(const auto Method: overloads) {
-                    const auto methodQualName = Method->getQualifiedNameAsString();
-                    const auto overloadName = fmt::format("overload_{}", overloadNames.size());
-                    auto methodScope = overloadScope.spawn(overloadName, methodQualName, "mc::Method");
-                    methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
-                    genMethodDispatcher(methodScope, Method, Record);
+        for(const auto& [rangeName, range]: descriptornames) {
+            wrap_range_in_tuple(rangeName, ownScope.inner, range);
+        }
 
-                    std::vector<std::string> parameters;
-                    for (const auto param: Method->parameters()) {
-                        auto parmName = param->getNameAsString();
-                        if (isCtorGrp) {
-                            const auto ctorDecl = static_cast<const clang::CXXConstructorDecl*>(Method);
-                            if(ctorDecl->isImplicit()) {
-                                parmName = fmt::format("implicit_arg_{}", parameters.size());
-                            }
-                        }
-
-                        auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
-                        paramScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
-                        parameters.emplace_back(fmt::format("meta_{}",parmName));
-                    }
-                    wrap_range_in_tuple("parameters", methodScope.inner, parameters);
-                    overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
-                }
-                wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
-                method_descriptors.emplace_back(fmt::format("meta_{}" , isCtorGrp ? "ctor" : overloadGroupName));
+        std::vector<std::string> genDeclRange;
+        for(const auto decl: decls) {
+            auto exportedScope = exportDeclaration(decl, ownScope);
+            if (!exportedScope.name.empty()) {
+                genDeclRange.emplace_back(fmt::format("meta_{}", exportedScope.name));
             }
         }
 
-        wrap_range_in_tuple("methods", ownScope.inner, method_descriptors);
+        exportedMetaTypes.emplace_back(std::tuple(qualName, ownScope.qualifiedName));
+        wrap_range_in_tuple("decls", ownScope.inner, genDeclRange);
+        return ownScope;
     }
 
-    void ReflectionDataGenerator::exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where) {
+    descriptor_scope ReflectionDataGenerator::exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where) {
         auto qualName = Enum->getQualifiedNameAsString();
         auto name = Enum->getNameAsString();
         if (name.empty()) {
@@ -330,130 +370,19 @@ namespace mc {
             enumerators.push_back(enumerator);
         }
 
+        exportedMetaTypes.emplace_back(std::tuple(qualName, ownScope.qualifiedName));
         wrap_range_in_tuple("enumerators", ownScope.inner, enumerators);
+        return ownScope;
     }
 
-    void ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
+    descriptor_scope ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Namespace");
         for(const auto decl: Namespace->decls()) {
             exportDeclaration(decl, ownScope);
         }
-    }
-
-    void ReflectionDataGenerator::genTypeDescriptor(const clang::Type *ty) {
-        return;
-        auto identifier = idman.id(ty);
-
-        if (idrepo.isDefined(identifier)) return;
-
-        switch (ty->getTypeClass()) {
-        case clang::Type::TypeClass::Builtin: {
-            // auto btIn = static_cast<const clang::BuiltinType*>(ty);
-            // const auto mcBuiltInName = builtinTypes.at(btIn->getKind());
-            // fmt::print(out, "const metal::BuiltinType {}(metal::BuiltinType::BuiltinKind::{}, \"{}\");",
-            //            identifier, mcBuiltInName, btIn->getCanonicalTypeInternal().getAsString(printingPolicy));
-            fmt::print(out, "const extern metal::BuiltinType {};\n",
-                       identifier);
-            idrepo.expectExternalIdentifier(identifier);
-        } break;
-
-        case clang::Type::TypeClass::Pointer: {
-            auto pTy = static_cast<const clang::PointerType *>(ty);
-            auto pointee = pTy->getPointeeType();
-            auto pteeIdent(idman.id(pointee.getTypePtr()));
-            if (!idrepo.isDefined(pteeIdent))
-                genTypeDescriptor(pointee.getTypePtr());
-            fmt::print(out, "const metal::PointerType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
-        } break;
-
-        case clang::Type::TypeClass::LValueReference: {
-            auto pTy = static_cast<const clang::LValueReferenceType *>(ty);
-            auto pointee = pTy->getPointeeType();
-            auto pteeIdent(idman.id(pointee.getTypePtr()));
-            if (!idrepo.isDefined(pteeIdent))
-                genTypeDescriptor(pointee.getTypePtr());
-            fmt::print(out, "const metal::LReferenceType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
-        } break;
-
-        case clang::Type::TypeClass::RValueReference: {
-            auto pTy = static_cast<const clang::RValueReferenceType *>(ty);
-            auto pointee = pTy->getPointeeType();
-            auto pteeIdent(idman.id(pointee.getTypePtr()));
-            if (!idrepo.isDefined(pteeIdent))
-                genTypeDescriptor(pointee.getTypePtr());
-            fmt::print(out, "const metal::RReferenceType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, pointee.isConstQualified(), pointee.isVolatileQualified(), pointee.isRestrictQualified(), pteeIdent, pointee.getAsString(printingPolicy));
-        } break;
-
-        case clang::Type::TypeClass::Typedef: {
-            auto tty = static_cast<const clang::TypedefType*>(ty);
-            auto tdecl = tty->getDecl();
-            auto ttIdent(idman.id(tdecl->getUnderlyingType().getTypePtr()));
-            if (!idrepo.isDefined(ttIdent))
-                genTypeDescriptor(tdecl->getUnderlyingType().getTypePtr());
-            fmt::print(out, "const metal::TypedefType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, tdecl->getUnderlyingType().isConstQualified(), tdecl->getUnderlyingType().isVolatileQualified(), tdecl->getUnderlyingType().isRestrictQualified(), ttIdent, tdecl->getQualifiedNameAsString());
-        } break;
-
-        case clang::Type::TypeClass::Elaborated: {
-            auto ety = static_cast<const clang::ElaboratedType*>(ty);
-            auto ttIdent(idman.id(ety->getNamedType().getTypePtr()));
-            if (!idrepo.isDefined(ttIdent))
-                genTypeDescriptor(ety->getNamedType().getTypePtr());
-
-            fmt::print(out, "const metal::TypedefType {} (\n\tmetal::QualType(\n\t\t{}, \n\t\t{}, \n\t\t{}, \n\t\t&{}\n\t), \n\t\"{}\"\n);\n", identifier, ety->getNamedType().isConstQualified(), ety->getNamedType().isVolatileQualified(), ety->getNamedType().isRestrictQualified(), ttIdent, ety->getNamedType().getAsString(printingPolicy));
-        } break;
-
-        case clang::Type::TypeClass::TemplateSpecialization: {
-            auto tty = static_cast<const clang::TemplateSpecializationType*>(ty);
-            auto decl = tty->getAsCXXRecordDecl();
-            const bool isInMainFile(decl->getASTContext().getSourceManager().isInMainFile(decl->getLocation()));
-
-            if (isInMainFile) {
-                llvm::SmallVector<char, 255> ttt;
-                llvm::raw_svector_ostream ot(ttt);
-
-                auto spec = static_cast<const clang::ClassTemplateSpecializationDecl*>(decl);
-                spec->printQualifiedName(ot);
-                ot << "<";
-                bool firstArg(true);
-                for (const auto &arg : spec->getTemplateArgs().asArray()) {
-                    if (firstArg) {
-                        firstArg = false;
-                    } else {
-                        ot << ", ";
-                    }
-                    arg.print(printingPolicy, ot);
-                }
-                ot << ">";
-                fmt::print(out, "const metal::RecordType {} ({}, \"{}\");\n",
-                           identifier, idman.id(static_cast<const clang::Decl *>(tty->getAsCXXRecordDecl())), tty->getAsCXXRecordDecl()->getQualifiedNameAsString());
-            } else {
-                idrepo.expectExternalIdentifier(identifier);
-                fmt::print(out, "extern const metal::RecordType {};\n", identifier);
-            }
-
-        } break;
-
-        case clang::Type::TypeClass::Record: {
-            auto tty = static_cast<const clang::RecordType*>(ty);
-
-            const bool isInMainFile(tty->getDecl()->getASTContext().getSourceManager().isInMainFile(tty->getDecl()->getLocation()));
-            if (isInMainFile) {
-                fmt::print(out, "const metal::RecordType {} ({}, \"{}\");\n",
-                           identifier, idman.id(static_cast<const clang::Decl *>(tty->getAsCXXRecordDecl())), tty->getDecl()->getQualifiedNameAsString());
-            } else {
-                idrepo.expectExternalIdentifier(identifier);
-                fmt::print(out, "extern const metal::RecordType {};\n", identifier);
-            }
-
-        } break;
-        default:
-            fmt::print(out, "// Type kind {} is not handled\n", ty->getCanonicalTypeInternal().getAsString(printingPolicy));
-            break;
-        }
-        idrepo.defineIdentifier(identifier);
-
+        return ownScope;
     }
 
 }

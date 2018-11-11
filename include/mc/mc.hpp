@@ -6,6 +6,9 @@
 #include <tuple>
 
 namespace mc {
+
+    template<typename T>
+    struct meta;
     
     template<typename Descriptor>
     struct Module {};
@@ -53,6 +56,15 @@ namespace mc {
     struct OverloadSet {};
 
     template<typename Descriptor>
+    struct Operator {};
+
+    template<typename Descriptor>
+    struct ConstructorSet {};
+
+    template<typename Descriptor>
+    struct Field {};
+
+    template<typename Descriptor>
     struct Class {
         using descriptor = Descriptor;
         constexpr bool has_method(std::string_view methodName) const {
@@ -61,5 +73,15 @@ namespace mc {
                 return (... || (meth.name == methodName));
             }, methods_tuple());
         }
+    };
+
+
+    class DynamicClass {
+    public:
+        virtual ~DynamicClass() = 0;
+        virtual bool hasMethod(std::string_view name) const = 0;
+        virtual void call(std::string_view method) const = 0;
+        virtual void call(std::string_view method) = 0;
+    private:
     };
 }

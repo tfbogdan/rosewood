@@ -6,8 +6,8 @@
 #include <functional>
 
 int main() {
-    using Jinx = mc::meta_Jinx::meta_jinx::meta_Jinx;
-    using JinxTypes = mc::meta_Jinx::meta_jinx::meta_JinxTypes;
+    using Jinx = mc::meta<jinx::Jinx>::type;
+    using JinxTypes = mc::meta<jinx::JinxTypes>::type;
 
     constexpr Jinx jinx;
     constexpr JinxTypes jinxTypes;

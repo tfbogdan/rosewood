@@ -15,7 +15,7 @@ namespace jinx {
     };
 
     typedef enum {
-        firstEnum, secondOne, third
+        firstEnum, secondOne, third = -3
     } UntypedEnum;
 
     class Jinx {
@@ -28,6 +28,13 @@ namespace jinx {
 
         void overloadedMethod();
         void overloadedMethod(int i);
+
+        float aField;
+
+        enum innerEnum{
+            firstEnum, secondOne, third = -3
+        };
+
 
     private:
         std::string name;
