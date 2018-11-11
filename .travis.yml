@@ -29,7 +29,7 @@ script:
   - export CC=gcc-7
   - export CXX=g++-7
   - cmake --version
-  - cmake $TRAVIS_BUILD_DIR
+  - cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Release
   - make
 
 
