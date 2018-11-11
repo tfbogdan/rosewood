@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.9)
 
-project(mc VERSION 0.0.0 LANGUAGES CXX)
+project(mc VERSION 0.0.1 LANGUAGES CXX)
 find_package(Clang REQUIRED)
 
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")

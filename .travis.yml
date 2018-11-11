@@ -20,7 +20,7 @@ script:
   - mkdir ~/llvm
   - cd ~/llvm
   - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
-  - tar xvf llvm.tar.xz --strip 1 # keep the v. makes debugging builds easier
+  - tar xf llvm.tar.xz --strip 1
 
   - cd ..
   - export Clang_DIR=./llvm/lib/cmake/clang
