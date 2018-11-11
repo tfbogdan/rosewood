@@ -19,8 +19,8 @@ int main() {
     static_assert (!jinxTypes.in_range(-27));
     static_assert (jinxTypes.in_range(-32));
 
-    auto aMethod = jinx.find_method<Jinx::methods>("aMethod");
-    using aMethodType = decltype (aMethod);
+    // auto aMethod = jinx.find_method<Jinx::methods>("aMethod");
+    // using aMethodType = decltype (aMethod);
 
     // static_assert (!std::is_same<aMethodType, mc::nil_t>::value);
 

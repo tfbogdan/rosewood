@@ -99,7 +99,7 @@ namespace mc {
             }, methods_tuple());
         }
 
-
+/*
         // This needs to be aware of overloads but for now let's just get the ball rolling with a simplistic approach
         template <typename tuple_t>
         constexpr auto find_method(const std::string_view method_name) const {
@@ -118,6 +118,7 @@ namespace mc {
                 return find_method<typename tuple_tail<methods_tuple>::type>(method_name);
             }
         }
+*/
     };
 
 
