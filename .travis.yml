@@ -25,7 +25,7 @@ script:
   - tar xf llvm.tar.xz --strip 1
 
   - cd ..
-  - export Clang_DIR=./llvm/lib/cmake/clang
+  - export Clang_DIR=~/llvm/lib/cmake/clang
 
   - export CC=gcc-7
   - export CXX=g++-7

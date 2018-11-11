@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.10)
-
 
 set(CLANG_LIBRARIES clangFrontend clangDriver clangParse clangSema)
 set(CLANG_LIBRARIES ${CLANG_LIBRARIES} clangAST clangLex clangBasic clangTooling )
