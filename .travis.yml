@@ -1,6 +1,6 @@
-dist: trusty
 sudo: require
 language: cpp
+compiler: gcc
 
 addons:
   apt: 
@@ -15,31 +15,24 @@ addons:
       - software-properties-common
       - cmake
 
-
 before_install:
   - sudo apt-get update
-
-
   - sudo pip install conan
 
-before_script:
-  - mkdir build
-  - cd build
-  - cmake ..
-
 script: 
-  - ln -s /usr/bin/gcc-6 /usr/local/bin/gcc
-  - ln -s /usr/bin/g++-6 /usr/local/bin/g++
-
   - mkdir ~/llvm
   - cd ~/llvm
   - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
   - tar xvf llvm.tar.xz --strip 1 # keep the v. makes debugging builds easier
+
   - cd ..
   - export Clang_DIR=./llvm/lib/cmake/clang
-  
+
   - mkdir build
   - cd build
+  - export CC=gcc-7
+  - export CXX=g++-7
+  - cmake --version
   - cmake ..
   - make
 
