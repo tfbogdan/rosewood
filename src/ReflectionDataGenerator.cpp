@@ -49,12 +49,17 @@ namespace mc {
 
         global_scope.putline("#pragma once");
         global_scope.putline("#include <mc/mc.hpp>");
+        auto mainFile = astContext.getSourceManager().getMainFileID();
+        auto mainFileLoc = astContext.getSourceManager().getComposedLoc(mainFile, 0);
+        auto mainFilePath = astContext.getSourceManager().getFilename(mainFileLoc);
+
+        global_scope.putline("#include \"{}\"", mainFilePath);
         global_scope.putline("");
         global_scope.putline("namespace mc {{");
     }
 
     ReflectionDataGenerator::~ReflectionDataGenerator() {
-        global_scope.putline("}} //::mc");
+        global_scope.putline("}}");
         idrepo.save(mcJsonOutput.getValue());
         out.flush();
     }
@@ -64,7 +69,7 @@ namespace mc {
         descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue(), "mc::Module");
 
         for(const auto decl: context.getTranslationUnitDecl()->decls()) {
-            // first cull out everything that isn't defined withing the `main` file
+            // first cull out everything that isn't defined within the `main` file
             const bool inMainFile(context.getSourceManager().isInMainFile(decl->getLocation()));
             if (inMainFile) {
                 exportDeclaration(decl, module_scope);
@@ -176,7 +181,7 @@ namespace mc {
         if (isConstructor) {
             argList.putline("void *addr{}", numArgs > 0 ? ",": "");
         } else {
-            argList.putline("{}::{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": "");
+            argList.putline("{}{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": "");
         }
 
         std::size_t index(0);
@@ -186,7 +191,7 @@ namespace mc {
         }
         descScope.putline(") {{");
         if (isConstructor) {
-            argList.putline("new (addr) ::{} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
+            argList.putline("new (addr) {} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
         } else {
             argList.putline("return obj.{} (", Method->getNameAsString());
         }
@@ -205,13 +210,46 @@ namespace mc {
         auto qualName = Record->getQualifiedNameAsString();
         auto name = Record->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Class");
-        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
         ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
         std::vector<std::string> method_descriptors;
         // in order to do overloading we need to do three passes over all methods
-        std::map<std::string, std::vector<clang::CXXMethodDecl*>> method_groups;
-        for(const auto Method: Record->methods()) {
-            method_groups[Method->getNameAsString()].push_back(Method);
+        std::map<llvm::StringRef, std::vector<const clang::CXXMethodDecl*>> method_groups;
+        std::map<std::string, std::vector<const clang::CXXMethodDecl*>> overloaded_operators;
+        // std::map<llvm::StringRef, std::vector<const clang::FunctionDecl*>> function_groups;
+        // std::map<std::string, std::vector<const clang::FunctionDecl*>> static_operator_groups;
+        std::vector<const clang::CXXConstructorDecl*> constructors;
+        std::vector<const clang::CXXConversionDecl*> conversions;
+        std::vector<const clang::FieldDecl*> fields;
+        std::vector<const clang::Decl*> decls;
+        const clang::CXXDestructorDecl *destructor;
+
+        for(const auto decl: Record->decls()) {
+            // first trim out non public members
+            if(decl->getAccess() != clang::AccessSpecifier::AS_public) continue;
+            switch (decl->getKind()) {
+            case clang::Decl::Kind::CXXMethod: {
+                auto method = static_cast<const clang::CXXMethodDecl*>(decl);
+                // TDO: the other half
+                if (!method->isOverloadedOperator()) {
+                    method_groups[method->getName()].push_back(method);
+                }
+            } break;
+            case clang::Decl::Kind::CXXConstructor: {
+                auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
+                constructors.push_back(ctor);
+            } break;
+            case clang::Decl::Kind::CXXDestructor: {
+                destructor = static_cast<const clang::CXXDestructorDecl*>(decl);
+            } break;
+            case clang::Decl::Kind::CXXConversion: {
+                auto conv = static_cast<const clang::CXXConversionDecl*>(decl);
+                conversions.push_back(conv);
+            } break;
+            case clang::Decl::Kind::Field: {} break;
+            default:
+                decls.push_back(decl);
+                break;
+            }
         }
 
         for(const auto& [overloadGroupName, overloads]: method_groups) {
@@ -224,7 +262,6 @@ namespace mc {
 
                 if (!overloadedOperator && !isCtor && !isDtor) {
                     auto methodScope = ownScope.spawn(overloadGroupName, methodQualName, "mc::Method");
-                    methodScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
                     genMethodDispatcher(methodScope, Method, Record);
                     methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
 
@@ -232,7 +269,6 @@ namespace mc {
                     for (const auto param: parameters) {
                         auto parmName = param->getNameAsString();
                         auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
-                        paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
                         methodScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
                     }
                     wrap_range_in_tuple("parameters", methodScope.inner, parameters);
@@ -242,14 +278,12 @@ namespace mc {
                 const bool isCtorGrp = overloadGroupName == name;
                 const auto methodQualName = overloads[0]->getQualifiedNameAsString();
                 auto overloadScope = ownScope.spawn(isCtorGrp ? "ctor" : overloadGroupName, methodQualName, "mc::OverloadSet");
-                overloadScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
                 std::vector<std::string> overloadNames;
 
                 for(const auto Method: overloads) {
                     const auto methodQualName = Method->getQualifiedNameAsString();
                     const auto overloadName = fmt::format("overload_{}", overloadNames.size());
                     auto methodScope = overloadScope.spawn(overloadName, methodQualName, "mc::Method");
-                    methodScope.putline("static constexpr std::string_view name = \"{}\";", overloadGroupName);
                     methodScope.putline("using return_type = {};", Method->getReturnType().getAsString(printingPolicy));
                     genMethodDispatcher(methodScope, Method, Record);
 
@@ -257,14 +291,13 @@ namespace mc {
                     for (const auto param: Method->parameters()) {
                         auto parmName = param->getNameAsString();
                         if (isCtorGrp) {
-                            const auto ctorDecl = static_cast<clang::CXXConstructorDecl*>(Method);
+                            const auto ctorDecl = static_cast<const clang::CXXConstructorDecl*>(Method);
                             if(ctorDecl->isImplicit()) {
                                 parmName = fmt::format("implicit_arg_{}", parameters.size());
                             }
                         }
 
                         auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
-                        paramScope.putline("static constexpr std::string_view name = \"{}\";", parmName);
                         paramScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
                         parameters.emplace_back(fmt::format("meta_{}",parmName));
                     }
@@ -282,16 +315,18 @@ namespace mc {
     void ReflectionDataGenerator::exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where) {
         auto qualName = Enum->getQualifiedNameAsString();
         auto name = Enum->getNameAsString();
+        if (name.empty()) {
+            name = Enum->getTypedefNameForAnonDecl()->getNameAsString();
+            qualName = Enum->getTypedefNameForAnonDecl()->getQualifiedNameAsString();
+        }
 
         auto ownScope = where.spawn(name, qualName, "mc::Enum");
-        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
         ownScope.putline("using type = {};", qualName);
         std::vector<clang::EnumConstantDecl*> enumerators;
         for(const auto enumerator: Enum->enumerators()) {
             auto enName = enumerator->getNameAsString();
             auto enScope = ownScope.spawn(enName, enumerator->getQualifiedNameAsString(), "mc::Enumerator");
-            enScope.putline("static constexpr std::string_view name = \"{}\";", enName);
-            enScope.putline("static constexpr int64_t value = {};", enumerator->getInitVal().getExtValue());
+            enScope.putline("static constexpr {} value = {};", Enum->getIntegerType().getTypePtrOrNull() ? Enum->getIntegerType().getAsString(printingPolicy) : "int",enumerator->getInitVal().toString(10));
             enumerators.push_back(enumerator);
         }
 
@@ -302,7 +337,6 @@ namespace mc {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Namespace");
-        ownScope.putline("static constexpr std::string_view name = \"{}\";", name);
         for(const auto decl: Namespace->decls()) {
             exportDeclaration(decl, ownScope);
         }

@@ -13,6 +13,12 @@
 #include <nlohmann/json.hpp>
 #include <fmt/ostream.h>
 
+inline std::ostream& operator<< (std::ostream& os, const llvm::StringRef& v) {
+    for (auto c: v) {
+        os << c;
+    }
+}
+
 extern llvm::cl::opt<std::string> mcModuleName;
 
 namespace mc {
@@ -106,8 +112,8 @@ struct descriptor_scope {
 
     void print_header() {
         if (!printed_header) {
-            outer.putline("// descriptor for {}", qualName);
             outer.putline("struct meta_{} : public {}<meta_{}> {{", name, kind, name);
+            inner.putline("static constexpr std::string_view name = \"{}\";", name);
             printed_header = true;
         }
     }

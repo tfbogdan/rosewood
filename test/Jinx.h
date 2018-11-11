@@ -14,10 +14,15 @@ namespace jinx {
         superJinx = 100
     };
 
+    typedef enum {
+        firstEnum, secondOne, third
+    } UntypedEnum;
+
     class Jinx {
     public:
         Jinx(const std::string& hisName)
             :name(hisName) {}
+
 
         int aMethod();
 
