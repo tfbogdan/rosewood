@@ -17,7 +17,7 @@ addons:
 
 script: 
   # - pip3 install conan pip3 install fails and it seems to be a bug in pip. luckily we have python2 pip to fall back to
-  - sudo pip install --upgrade pip
+  # - sudo pip install --upgrade pip
   - sudo pip install conan
   - mkdir ~/llvm
   - cd ~/llvm
