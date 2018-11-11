@@ -62,10 +62,7 @@ namespace mc {
     ReflectionDataGenerator::~ReflectionDataGenerator() {
         for(const auto &[declName, descriptorName]: exportedMetaTypes) {
             global_scope.putline("template <>");
-            global_scope.putline("struct meta <{}> {{", declName);
-            auto inner_scope = global_scope.spawn();
-            inner_scope.putline("using type = {};", descriptorName);
-            global_scope.putline("}};");
+            global_scope.putline("struct meta <{}> : public {} {{}};", declName, descriptorName);
         }
 
         global_scope.putline("}}");

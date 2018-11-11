@@ -2,12 +2,14 @@
 #include "Jinx.metadata.h"
 
 #include <mc/mc.hpp>
+#include <fmt/printf.h>
 #include <iostream>
 #include <functional>
+#include <memory>
 
 int main() {
-    using Jinx = mc::meta<jinx::Jinx>::type;
-    using JinxTypes = mc::meta<jinx::JinxTypes>::type;
+    using Jinx = mc::meta<jinx::Jinx>;
+    using JinxTypes = mc::meta<jinx::JinxTypes>;
 
     constexpr Jinx jinx;
     constexpr JinxTypes jinxTypes;
@@ -18,8 +20,12 @@ int main() {
     static_assert (jinxTypes.in_range(-32));
 
     jinxTypes.for_each_enumerator([](const auto &en){
-        std::cout << "  " << en.name << ": " << en.value << "\n";
+        fmt::print("  {}: {:d}\n", en.name, en.value);
     });
 
-    return 0;
+
+    std::unique_ptr<mc::DynamicClass> dynamicJinx(new mc::DynamicClassWrapper<jinx::Jinx>);
+    fmt::print("Jinx has a `{}` method: {}\n", "no such method", dynamicJinx->hasMethod("no such method"));
+    fmt::print("Jinx has a `{}` method: {}\n", "aMethod", dynamicJinx->hasMethod("aMethod"));
+    // return dynamicJinx-;
 }
