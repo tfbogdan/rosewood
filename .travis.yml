@@ -1,4 +1,4 @@
-sudo: required
+sudo: false
 dist: trusty
 language: cpp
 compiler: gcc
@@ -17,8 +17,8 @@ addons:
 
 script: 
   # - pip3 install conan pip3 install fails and it seems to be a bug in pip. luckily we have python2 pip to fall back to
-  - pip install --upgrade pip
-  - pip install conan
+  - sudo pip install --upgrade pip
+  - sudo pip install conan
   - mkdir ~/llvm
   - cd ~/llvm
   - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
