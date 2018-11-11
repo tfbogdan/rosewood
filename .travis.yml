@@ -17,6 +17,7 @@ addons:
 
 script: 
   # - pip3 install conan pip3 install fails and it seems to be a bug in pip. luckily we have python2 pip to fall back to
+  - pip install --upgrade pip
   - pip install conan
   - mkdir ~/llvm
   - cd ~/llvm
@@ -30,7 +31,8 @@ script:
   - export CC=gcc-7
   - export CXX=g++-7
   - cmake --version
-  - cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Release
+  - cd $TRAVIS_BUILD_DIR
+  - cmake-DCMAKE_BUILD_TYPE=Release ..
   - make
   - ./bin/mc_test
 
