@@ -32,5 +32,6 @@ script:
   - cmake --version
   - cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Release
   - make
+  - ./bin/mc_test
 
 
