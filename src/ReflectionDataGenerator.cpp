@@ -115,8 +115,8 @@ namespace mc {
         where.putline("using {} = std::tuple<", withName);
         auto initScope = where.spawn();
 
-        for(std::size_t idx(0); idx < numElements; ++idx) {
-            const auto& item = range[idx];
+        std::size_t idx(0);
+        for(const auto& item: range) {
             initScope.indent();
             if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
                 initScope.rawput(item);
@@ -128,6 +128,7 @@ namespace mc {
                 initScope.rawput(",");
             }
             initScope.rawput("\n");
+            ++idx;
         }
         where.putline(">;");
     }
@@ -268,7 +269,7 @@ namespace mc {
         auto name = Record->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Class");
         ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
-        std::map<std::string_view, std::vector<std::string>> descriptornames;
+        std::map<std::string_view, std::set<std::string>> descriptornames;
 
         // in order to do overloading we need to do three passes over all methods
         std::map<std::string, std::vector<const clang::CXXMethodDecl*>> method_groups;
@@ -291,11 +292,11 @@ namespace mc {
                 if (!method->isOverloadedOperator()) {
                     const auto methodName = method->getNameAsString();
                     method_groups[methodName].push_back(method);
-                    descriptornames["methods"].emplace_back(fmt::format("meta_{}", methodName));
+                    descriptornames["methods"].insert(fmt::format("meta_{}", methodName));
                 } else {
                     const auto opName = fmt::format("operator_{}", overloaded_operators.size());
                     overloaded_operators[opName].push_back(method);
-                    descriptornames["operators"].emplace_back(fmt::format("meta_{}", opName));
+                    descriptornames["operators"].insert(fmt::format("meta_{}", opName));
                 }
             } break;
             case clang::Decl::Kind::CXXConstructor: {
@@ -312,7 +313,7 @@ namespace mc {
             case clang::Decl::Kind::Field: {
                 auto field = static_cast<const clang::FieldDecl*>(decl);
                 fields.push_back(field);
-                descriptornames["fields"].emplace_back(fmt::format("meta_{}", field->getNameAsString()));
+                descriptornames["fields"].insert(fmt::format("meta_{}", field->getNameAsString()));
             } break;
             default:
                 decls.push_back(decl);
