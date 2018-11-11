@@ -13,9 +13,10 @@ addons:
     - g++-7
     - curl
     - cmake
+    - python3-pip
 
 script: 
-  - sudo pip install conan
+  - pip3 install conan
   - mkdir ~/llvm
   - cd ~/llvm
   - curl "http://releases.llvm.org/7.0.0/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz" -o "llvm.tar.xz"
@@ -24,12 +25,11 @@ script:
   - cd ..
   - export Clang_DIR=./llvm/lib/cmake/clang
 
-  - mkdir build
   - cd build
   - export CC=gcc-7
   - export CXX=g++-7
   - cmake --version
-  - cmake ..
+  - cmake $TRAVIS_BUILD_DIR
   - make
 
 
