@@ -1,4 +1,3 @@
-sudo: require
 language: cpp
 compiler: gcc
 
@@ -6,17 +5,13 @@ addons:
   apt: 
     - sources:
       - ubuntu-toolchain-r-test
-      - universe
     - packages:
       - gcc-7
       - g++-7
-      - python3-pip
       - curl
-      - software-properties-common
       - cmake
 
 before_install:
-  - sudo apt-get update
   - sudo pip install conan
 
 script: 
