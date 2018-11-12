@@ -9,8 +9,11 @@
 
 #include <gtest/gtest.h>
 
+struct predicate {
+    static constexpr std::string_view pred = "aMethod";
+};
 
-TEST(MC, compiletime) {
+TEST(MC, general) {
     using sv = std::string_view;
 
     using Jinx = mc::meta<jinx::Jinx>;
@@ -19,8 +22,7 @@ TEST(MC, compiletime) {
     constexpr Jinx jinx;
     constexpr JinxTypes jinxTypes;
 
-    constexpr sv aMethod = "aMethod";
-    static_assert (jinx.has_overload_set(aMethod));
+    static_assert (jinx.has_overload_set("aMethod"));
     static_assert (!jinx.has_overload_set("fictionalMethod"));
     static_assert (!jinxTypes.in_range(-27));
     static_assert (jinxTypes.in_range(-32));
@@ -69,4 +71,12 @@ TEST(MC, compiletime) {
     std::unique_ptr<mc::DynamicClass> dynamicJinx(new mc::DynamicClassWrapper<jinx::Jinx>);
     EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
     EXPECT_TRUE(dynamicJinx->hasMethod("aMethod"));
+
+    auto aMethod = jinx.get_overload_set(predicate());
+    static_assert (aMethod.num_overloads() == 1);
+    auto onlyOverload = aMethod.get_overload<0>();
+    static_assert (onlyOverload.num_params() == 1);
+    auto onlyParam = onlyOverload.get_param<0>();
+    static_assert (std::is_same<decltype(onlyParam)::type, int>::value);
+    static_assert (onlyParam.get_name() == "namedParam");
 }

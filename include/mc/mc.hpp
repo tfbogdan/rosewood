@@ -9,6 +9,19 @@ namespace mc {
 
     struct nil_t {};
 
+    template <typename T>
+    struct tuple_seeker;
+
+    template <typename headT, typename ...remainingTypes>
+    struct tuple_seeker<std::tuple<headT, remainingTypes...>> {
+        using tail = std::tuple<remainingTypes...>;
+    };
+
+    template <typename headT>
+    struct tuple_seeker<std::tuple<headT>> {
+        using tail = std::tuple<>;
+    };
+
     template <typename>
     struct tuple_tail;
 
@@ -85,6 +98,13 @@ namespace mc {
             using parameters = typename descriptor::parameters;
             return std::tuple_size<parameters>::value;
         }
+
+        template<unsigned index>
+        constexpr auto get_param() const noexcept {
+            using parameters = typename descriptor::parameters;
+            using param = typename std::tuple_element<index, parameters>::type;
+            return param();
+        }
     };
 
     template<typename Descriptor>
@@ -106,6 +126,13 @@ namespace mc {
             using overloads = typename descriptor::overloads;
             return std::tuple_size<overloads>::value;
         }
+
+        template<unsigned index>
+        constexpr auto get_overload() const noexcept {
+            using overloads = typename descriptor::overloads;
+            using overload = typename std::tuple_element<index, overloads>::type;
+            return overload();
+        }
     };
 
     template<typename Descriptor>
@@ -116,6 +143,18 @@ namespace mc {
 
     template<typename Descriptor>
     struct Field {};
+
+    template <typename tupleT, typename pred>
+    constexpr auto get_by_name(tupleT, pred p) noexcept {
+        static_assert (std::tuple_size<tupleT>::value > 0, "no element found with ::name == pred::pred");
+        using headT = typename std::tuple_element<0, tupleT>::type;
+        if constexpr(pred::pred == headT::name) {
+            return headT();
+        } else {
+            using tailT = typename tuple_seeker<tupleT>::tail;
+            return get_by_name<typename tuple_seeker<tupleT>::tail>(tailT(), p);
+        }
+    }
 
     template<typename Descriptor>
     struct Class {
@@ -134,6 +173,12 @@ namespace mc {
             std::apply([visitor](auto ...overloads) {
                 (visitor(overloads), ...);
             }, overload_sets());
+        }
+
+        template<typename predicate>
+        constexpr auto get_overload_set(predicate pred) const noexcept {
+            using overloads_sets = typename descriptor::methods;
+            return get_by_name(overloads_sets(), pred);
         }
 
     };
