@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 
 project(mc VERSION 0.0.1 LANGUAGES CXX)
 find_package(Clang REQUIRED CONFIG)
-
+enable_testing()
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
    message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.12/conan.cmake"

@@ -54,7 +54,7 @@ namespace mc {
         auto mainFileLoc = astContext.getSourceManager().getComposedLoc(mainFile, 0);
         auto mainFilePath = astContext.getSourceManager().getFilename(mainFileLoc);
 
-        global_scope.putline("#include \"{}\"", mainFilePath);
+        global_scope.putline("#include \"{}\"", mainFilePath.str());
         global_scope.putline("");
         global_scope.putline("namespace mc {{");
     }

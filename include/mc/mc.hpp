@@ -53,18 +53,37 @@ namespace mc {
     };
 
     template<typename Descriptor>
-    struct Enumerator {};
+    struct Enumerator {
+        using descriptor = Descriptor;
+        constexpr std::string_view get_name() const noexcept {
+            return descriptor::name;
+        }
+    };
 
     template<typename Descriptor>
-    struct Parameter {};
+    struct Parameter {
+        using descriptor = Descriptor;
+
+        constexpr std::string_view get_name() const {
+            return descriptor::name;
+        }
+    };
 
     template<typename Descriptor>
     struct Method {
         using descriptor = Descriptor;
 
-        template <typename ...Args>
-        constexpr auto operator()(Args&& ...args) {
+        template <typename visitorT>
+        void for_each_parameter(visitorT visitor) const {
+            using param_tuple = typename descriptor::parameters;
+            std::apply([visitor] (auto ...params){
+                (visitor(params), ...);
+            }, param_tuple());
+        }
 
+        constexpr int num_params() const noexcept {
+            using parameters = typename descriptor::parameters;
+            return std::tuple_size<parameters>::value;
         }
     };
 
@@ -75,8 +94,17 @@ namespace mc {
             return descriptor::name;
         }
 
-        constexpr bool operator==(const std::string_view nm) const {
-            return get_name() == nm;
+        template <typename visitorT>
+        void for_each_overload(visitorT visitor) const noexcept {
+            using overloads = typename descriptor::overloads;
+            std::apply([visitor](auto ...overload){
+                (visitor(overload), ...);
+            }, overloads());
+        }
+
+        constexpr int num_overloads() const noexcept {
+            using overloads = typename descriptor::overloads;
+            return std::tuple_size<overloads>::value;
         }
     };
 
@@ -91,60 +119,25 @@ namespace mc {
 
     template<typename Descriptor>
     struct Class {
+
         using descriptor = Descriptor;
-        constexpr bool has_method(std::string_view methodName) const {
+        constexpr bool has_overload_set(std::string_view Name) const noexcept {
             using methods_tuple = typename descriptor::methods;
-            return std::apply([methodName] (auto ...meth) {
-                return (... || (meth.name == methodName));
+            return std::apply([Name] (auto ...meth) {
+                return (... || (meth.name == Name));
             }, methods_tuple());
         }
 
-/*
-        // This needs to be aware of overloads but for now let's just get the ball rolling with a simplistic approach
-        template <typename tuple_t>
-        constexpr auto find_method(const std::string_view method_name) const {
-
-            using methods_tuple = tuple_t;
-
-            if constexpr (std::tuple_size<methods_tuple>::value == 0) {
-                return mc::nil_t();
-            }
-
-            using head_type = typename std::tuple_element<0, methods_tuple>::type;
-            // return head_type();
-            if constexpr(head_type() == method_name) {
-                return head_type();
-            } else {
-                return find_method<typename tuple_tail<methods_tuple>::type>(method_name);
-            }
-        }
-*/
-    };
-
-
-    class DynamicClass {
-    public:
-        virtual ~DynamicClass() = 0;
-        virtual bool hasMethod(std::string_view name) const = 0;
-        virtual void call(std::string_view method, const void *obj, int argc, void **argv) const = 0;
-        // virtual void call(std::string_view method, void *obj, int argc, void **argv) = 0;
-    private:
-    };
-    DynamicClass::~DynamicClass() = default;
-
-    template <typename WrappedType>
-    class DynamicClassWrapper : public DynamicClass, public mc::meta<WrappedType>{
-        using descriptor = mc::meta<WrappedType>;
-
-        inline virtual ~DynamicClassWrapper() = default;
-        inline virtual bool hasMethod(std::string_view name) const {
-            return descriptor::has_method(name);
-        }
-
-        inline virtual void call(std::string_view method, const void *obj, int argc, void **argv) const {
-            const auto& Object = *static_cast<const typename descriptor::type*>(obj);
+        template<typename visitorT>
+        constexpr void visit_overload_sets(visitorT visitor) const noexcept {
+            using overload_sets = typename descriptor::methods;
+            std::apply([visitor](auto ...overloads) {
+                (visitor(overloads), ...);
+            }, overload_sets());
         }
 
     };
+
+
 
 }

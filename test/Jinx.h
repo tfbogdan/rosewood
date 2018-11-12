@@ -24,7 +24,7 @@ namespace jinx {
             :name(hisName) {}
 
 
-        int aMethod();
+        int aMethod(int namedParam);
 
         void overloadedMethod();
         void overloadedMethod(int i);
