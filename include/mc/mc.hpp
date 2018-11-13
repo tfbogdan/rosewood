@@ -3,11 +3,49 @@
 #include <cstdint>
 #include <functional>
 #include <string_view>
+#include <algorithm>
 #include <tuple>
+#include <type_traits>
 
 namespace mc {
-
     struct nil_t {};
+
+    template <typename t1, typename t2>
+    struct tuple_cat_static;
+
+    template<typename ...tuples>
+    struct tuple_type_cat {
+        static constexpr auto apply_cat = [] () {
+            return std::apply([](auto ...tuple_types){
+                return std::tuple_cat(((tuple_types),...));
+            }, std::tuple<tuples...>{});
+        };
+        using type = decltype(apply_cat());
+    };
+
+    template <typename T>
+    constexpr decltype (auto) construct() noexcept {
+        return T();
+    }
+
+    template <template<typename> typename wrapping_type, typename Tuple>
+    struct tuple_elements_wrapper;
+
+    template <template<typename> typename wrapping_type>
+    struct tuple_elements_wrapper<wrapping_type, std::tuple<>> {
+        using type =std::tuple<>;
+    };
+
+    template <template<typename> typename wrapping_type, typename TupleHead, typename ...TupleTypes>
+    struct tuple_elements_wrapper<wrapping_type, std::tuple<TupleHead, TupleTypes...>> {
+        using type = decltype(
+            std::tuple_cat(
+                construct<std::tuple<wrapping_type<TupleHead>>>(),
+                construct<typename tuple_elements_wrapper<wrapping_type, std::tuple<TupleTypes...>>::type>()
+            )
+        );
+    };
+
 
     template <typename T>
     struct tuple_seeker;
@@ -64,6 +102,8 @@ namespace mc {
             }, enumerators_tuple());
         }
     };
+
+
 
     template<typename Descriptor>
     struct Enumerator {
@@ -184,5 +224,34 @@ namespace mc {
     };
 
 
+    template<typename T>
+    struct is_enum {
+        static constexpr bool value = false;
+    };
 
+    template<typename DescType>
+    struct is_enum<Enum<DescType>> {
+        static constexpr bool value = true;
+    };
+
+    template<typename T>
+    struct is_class {
+        static constexpr bool value = false;
+    };
+
+    template<typename DescType>
+    struct is_class<Class<DescType>> {
+        static constexpr bool value = true;
+    };
+
+
+    template<typename T>
+    struct is_namespace {
+        static constexpr bool value = false;
+    };
+
+    template<typename DescType>
+    struct is_namespace<Namespace<DescType>> {
+        static constexpr bool value = true;
+    };
 }

@@ -2,5 +2,8 @@
 
 
 namespace mc {
-    DynamicClass::~DynamicClass() = default;
+    DMetaDecl::~DMetaDecl() = default;
+    DEnum::~DEnum() = default;
+    DNamespace::~DNamespace() = default;
+    DClass::~DClass() = default;
 }

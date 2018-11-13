@@ -14,7 +14,6 @@ struct predicate {
 };
 
 TEST(MC, general) {
-    using sv = std::string_view;
 
     using Jinx = mc::meta<jinx::Jinx>;
     using JinxTypes = mc::meta<jinx::JinxTypes>;
@@ -68,7 +67,7 @@ TEST(MC, general) {
         }
     });
 
-    std::unique_ptr<mc::DynamicClass> dynamicJinx(new mc::DynamicClassWrapper<jinx::Jinx>);
+    std::unique_ptr<mc::DClass> dynamicJinx(new mc::DClassWrapper<mc::meta<jinx::Jinx>>);
     EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
     EXPECT_TRUE(dynamicJinx->hasMethod("aMethod"));
 
@@ -79,4 +78,17 @@ TEST(MC, general) {
     auto onlyParam = onlyOverload.get_param<0>();
     static_assert (std::is_same<decltype(onlyParam)::type, int>::value);
     static_assert (onlyParam.get_name() == "namedParam");
+
+    using JinxModule = mc::DNamespaceWrapper<mc::meta_Jinx>;
+    JinxModule module;
+
+    EXPECT_EQ(module.getNamespaces()[0]->getName(), "jinx");
+    EXPECT_EQ(module.getClasses().size(), 0);
+    EXPECT_EQ(module.getEnums().size(), 0);
+
+    const mc::DNamespace *dJinx = module.getNamespaces()[0];
+
+    EXPECT_EQ(dJinx->getNamespaces().size(), 0);
+    EXPECT_EQ(dJinx->getEnums().size(), 2);
+    EXPECT_EQ(dJinx->getClasses().size(), 1);
 }

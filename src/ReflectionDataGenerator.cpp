@@ -70,17 +70,74 @@ namespace mc {
         out.flush();
     }
 
+    template <typename declRangeT>
+    void wrap_range_in_tuple(std::string_view withName, scope where, const declRangeT &range) {
+        const std::size_t numElements = std::size(range);
+        if (numElements == 0) {
+            where.putline("using {} = std::tuple<>;", withName);
+            return;
+        }
+
+        where.putline("using {} = std::tuple<", withName);
+        auto initScope = where.spawn();
+
+        std::size_t idx(0);
+        for(const auto& item: range) {
+            initScope.indent();
+
+            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
+                initScope.rawput(item);
+            } else {
+                auto itemName = item->getNameAsString();
+                initScope.rawput("meta_{}", itemName);
+            }
+
+            if (idx < (numElements - 1)) {
+                initScope.rawput(",");
+            }
+
+            initScope.rawput("\n");
+            ++idx;
+        }
+        where.putline(">;");
+    }
+
     void ReflectionDataGenerator::Generate() {
         printingPolicy = context.getPrintingPolicy();
         descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue(), "mc::Module");
+
+        std::vector<std::string> exportedNamespaces;
+        std::vector<std::string> exportedEnums;
+        std::vector<std::string> exportedClasses;
 
         for(const auto decl: context.getTranslationUnitDecl()->decls()) {
             // first cull out everything that isn't defined within the `main` file
             const bool inMainFile(context.getSourceManager().isInMainFile(decl->getLocation()));
             if (inMainFile) {
-                exportDeclaration(decl, module_scope);
+                switch(auto declKind = decl->getKind()) {
+                case clang::Decl::Kind::Namespace:
+                    exportedNamespaces.push_back(fmt::format("meta_{}", exportNamespace(static_cast<const clang::NamespaceDecl*>(decl), module_scope).name));
+                    break;
+                case clang::Decl::Kind::Enum:
+                    exportedEnums.push_back(fmt::format("meta_{}", exportEnum(static_cast<const clang::EnumDecl*>(decl), module_scope).name));
+                    break;
+                case clang::Decl::Kind::CXXRecord: {
+                    auto record = static_cast<const clang::CXXRecordDecl*>(decl);
+                    if (record->isThisDeclarationADefinition()) {
+                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), module_scope).name));
+                    }
+                } break;
+                default:
+                    // report?
+                    break;
+                }
             }
+
+
         }
+        wrap_range_in_tuple("namespaces", module_scope.inner, exportedNamespaces);
+        wrap_range_in_tuple("enums", module_scope.inner, exportedEnums);
+        wrap_range_in_tuple("classes", module_scope.inner, exportedClasses);
     }
 
     descriptor_scope ReflectionDataGenerator::exportDeclaration(const clang::Decl *Decl, descriptor_scope &where) {
@@ -103,35 +160,6 @@ namespace mc {
         return where.spawn("", "", "");
     }
 
-
-    template <typename declRangeT>
-    void wrap_range_in_tuple(std::string_view withName, scope where, const declRangeT &range) {
-        const std::size_t numElements = std::size(range);
-        if (numElements == 0) {
-            where.putline("using {} = std::tuple<>;", withName);
-            return;
-        }
-
-        where.putline("using {} = std::tuple<", withName);
-        auto initScope = where.spawn();
-
-        std::size_t idx(0);
-        for(const auto& item: range) {
-            initScope.indent();
-            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
-                initScope.rawput(item);
-            } else {
-                auto itemName = item->getNameAsString();
-                initScope.rawput("meta_{}", itemName);
-            }
-            if (idx < (numElements - 1)) {
-                initScope.rawput(",");
-            }
-            initScope.rawput("\n");
-            ++idx;
-        }
-        where.putline(">;");
-    }
 
     void genMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
         // this should be more elaborate and should consider all method attributes ( is const for example )
@@ -377,9 +405,35 @@ namespace mc {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Namespace");
+
+
+        std::vector<std::string> exportedNamespaces;
+        std::vector<std::string> exportedEnums;
+        std::vector<std::string> exportedClasses;
+
         for(const auto decl: Namespace->decls()) {
-            exportDeclaration(decl, ownScope);
+            switch(auto declKind = decl->getKind()) {
+            case clang::Decl::Kind::Namespace:
+                exportedNamespaces.push_back(fmt::format("meta_{}", exportNamespace(static_cast<const clang::NamespaceDecl*>(decl), ownScope).name));
+                break;
+            case clang::Decl::Kind::Enum:
+                exportedEnums.push_back(fmt::format("meta_{}", exportEnum(static_cast<const clang::EnumDecl*>(decl), ownScope).name));
+                break;
+            case clang::Decl::Kind::CXXRecord: {
+                auto record = static_cast<const clang::CXXRecordDecl*>(decl);
+                if (record->isThisDeclarationADefinition()) {
+                    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), ownScope).name));
+                }
+            } break;
+            default:
+                // report?
+                break;
+            }
         }
+        wrap_range_in_tuple("namespaces", ownScope.inner, exportedNamespaces);
+        wrap_range_in_tuple("enums", ownScope.inner, exportedEnums);
+        wrap_range_in_tuple("classes", ownScope.inner, exportedClasses);
+
         return ownScope;
     }
 
