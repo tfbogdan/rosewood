@@ -201,7 +201,7 @@ namespace mc {
 
         using descriptor = Descriptor;
         constexpr bool has_overload_set(std::string_view Name) const noexcept {
-            using methods_tuple = typename descriptor::methods;
+            using methods_tuple = typename descriptor::overload_sets;
             return std::apply([Name] (auto ...meth) {
                 return (... || (meth.name == Name));
             }, methods_tuple());
@@ -209,7 +209,7 @@ namespace mc {
 
         template<typename visitorT>
         constexpr void visit_overload_sets(visitorT visitor) const noexcept {
-            using overload_sets = typename descriptor::methods;
+            using overload_sets = typename descriptor::overload_sets;
             std::apply([visitor](auto ...overloads) {
                 (visitor(overloads), ...);
             }, overload_sets());
@@ -217,7 +217,7 @@ namespace mc {
 
         template<typename predicate>
         constexpr auto get_overload_set(predicate pred) const noexcept {
-            using overloads_sets = typename descriptor::methods;
+            using overloads_sets = typename descriptor::overload_sets;
             return get_by_name(overloads_sets(), pred);
         }
 

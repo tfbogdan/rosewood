@@ -4,6 +4,8 @@
 namespace mc {
     DMetaDecl::~DMetaDecl() = default;
     DEnum::~DEnum() = default;
+    DClassContainer::~DClassContainer() = default;
+    DEnumContainer::~DEnumContainer() = default;
     DNamespace::~DNamespace() = default;
     DClass::~DClass() = default;
 }

@@ -13,19 +13,9 @@ struct predicate {
     static constexpr std::string_view pred = "aMethod";
 };
 
-TEST(MC, general) {
-
-    using Jinx = mc::meta<jinx::Jinx>;
+TEST(mc, static_enumeration) {
     using JinxTypes = mc::meta<jinx::JinxTypes>;
-
-    constexpr Jinx jinx;
     constexpr JinxTypes jinxTypes;
-
-    static_assert (jinx.has_overload_set("aMethod"));
-    static_assert (!jinx.has_overload_set("fictionalMethod"));
-    static_assert (!jinxTypes.in_range(-27));
-    static_assert (jinxTypes.in_range(-32));
-
 
     const std::vector<std::pair<std::string, int>> expectedEnums {
         std::pair("underJinx", -32),
@@ -40,18 +30,29 @@ TEST(MC, general) {
         jinxEnumerators.emplace_back(en.get_name(), en.value);
     });
 
-
     EXPECT_EQ (jinxEnumerators, expectedEnums);
+
+    static_assert (!jinxTypes.in_range(-27));
+    static_assert (jinxTypes.in_range(-32));
+
+    EXPECT_TRUE(jinxTypes.in_range(-31));
+    EXPECT_FALSE(jinxTypes.in_range(222));
+}
+
+
+TEST(mc, static_class) {
+    using Jinx = mc::meta<jinx::Jinx>;
+    constexpr Jinx jinx;
+
+    static_assert (jinx.has_overload_set("aMethod"));
+    static_assert (!jinx.has_overload_set("fictionalMethod"));
 
     const std::vector<std::string> expectedJinxMethods {
         "aMethod",
         "overloadedMethod"
     };
-    EXPECT_TRUE(jinxTypes.in_range(-31));
-    EXPECT_FALSE(jinxTypes.in_range(222));
 
     std::vector<std::string> jinxMethods;
-
 
     jinx.visit_overload_sets([&jinxMethods](auto overloadSet) constexpr {
         EXPECT_NE(overloadSet.get_name(), "");
@@ -67,9 +68,6 @@ TEST(MC, general) {
         }
     });
 
-    std::unique_ptr<mc::DClass> dynamicJinx(new mc::DClassWrapper<mc::meta<jinx::Jinx>>);
-    EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
-    EXPECT_TRUE(dynamicJinx->hasMethod("aMethod"));
 
     auto aMethod = jinx.get_overload_set(predicate());
     static_assert (aMethod.num_overloads() == 1);
@@ -78,7 +76,9 @@ TEST(MC, general) {
     auto onlyParam = onlyOverload.get_param<0>();
     static_assert (std::is_same<decltype(onlyParam)::type, int>::value);
     static_assert (onlyParam.get_name() == "namedParam");
+}
 
+TEST(mc, runtime_module) {
     using JinxModule = mc::DNamespaceWrapper<mc::meta_Jinx>;
     JinxModule module;
 
@@ -91,4 +91,25 @@ TEST(MC, general) {
     EXPECT_EQ(dJinx->getNamespaces().size(), 0);
     EXPECT_EQ(dJinx->getEnums().size(), 2);
     EXPECT_EQ(dJinx->getClasses().size(), 1);
+}
+
+TEST(mc, runtime_namespace) {
+    using JinxModule = mc::DNamespaceWrapper<mc::meta_Jinx>;
+    JinxModule module;
+
+    const mc::DNamespace *dJinx = module.getNamespaces()[0];
+
+    EXPECT_EQ(dJinx->getNamespaces().size(), 0);
+    EXPECT_EQ(dJinx->getEnums().size(), 2);
+    EXPECT_EQ(dJinx->getClasses().size(), 1);
+
+    EXPECT_THROW(dJinx->findChildNamespace("unthinkable"), std::out_of_range);
+    EXPECT_NO_THROW(module.findChildNamespace("jinx"));
+    EXPECT_EQ(module.findChildNamespace("jinx"), dJinx);
+}
+
+TEST(mc, runtime_class) {
+    std::unique_ptr<mc::DClass> dynamicJinx(new mc::DClassWrapper<mc::meta<jinx::Jinx>>);
+    EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
+    EXPECT_TRUE(dynamicJinx->hasMethod("aMethod"));
 }

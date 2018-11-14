@@ -297,7 +297,13 @@ namespace mc {
         auto name = Record->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Class");
         ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
-        std::map<std::string_view, std::set<std::string>> descriptornames;
+        std::map<std::string_view, std::set<std::string>> descriptornames = {
+            {"classes", {}},
+            {"overload_sets", {}},
+            {"operators", {}}, // not 100% these shouldn't just be treated as any other methods
+            {"fields", {}},
+            {"enums", {}}
+        };
 
         // in order to do overloading we need to do three passes over all methods
         std::map<std::string, std::vector<const clang::CXXMethodDecl*>> method_groups;
@@ -307,7 +313,10 @@ namespace mc {
         std::vector<const clang::CXXConstructorDecl*> constructors;
         std::vector<const clang::CXXConversionDecl*> conversions;
         std::vector<const clang::FieldDecl*> fields;
-        std::vector<const clang::Decl*> decls;
+        std::vector<const clang::CXXRecordDecl*> classes;
+        std::vector<const clang::EnumDecl*> enums;
+
+        // std::vector<const clang::Decl*> decls;
         const clang::CXXDestructorDecl *destructor = nullptr;
 
         for(const auto decl: Record->decls()) {
@@ -320,7 +329,7 @@ namespace mc {
                 if (!method->isOverloadedOperator()) {
                     const auto methodName = method->getNameAsString();
                     method_groups[methodName].push_back(method);
-                    descriptornames["methods"].insert(fmt::format("meta_{}", methodName));
+                    descriptornames["overload_sets"].insert(fmt::format("meta_{}", methodName));
                 } else {
                     const auto opName = fmt::format("operator_{}", overloaded_operators.size());
                     overloaded_operators[opName].push_back(method);
@@ -343,8 +352,21 @@ namespace mc {
                 fields.push_back(field);
                 descriptornames["fields"].insert(fmt::format("meta_{}", field->getNameAsString()));
             } break;
+            case clang::Decl::Kind::CXXRecord: {
+                auto cls = static_cast<const clang::CXXRecordDecl*>(decl);
+                if (cls->isThisDeclarationADefinition()) {
+                    classes.push_back(cls);
+                }
+            } break;
+            case clang::Decl::Kind::Enum: {
+                auto en = static_cast<const clang::EnumDecl*>(decl);
+                if (en->isThisDeclarationADefinition()) {
+                    enums.push_back(en);
+                }
+            } break;
+
             default:
-                decls.push_back(decl);
+                // decls.push_back(decl);
                 break;
             }
         }
@@ -359,22 +381,33 @@ namespace mc {
         }
 
         exportFields(fields, ownScope);
-        if (destructor != nullptr) exportCxxDestructor(destructor, Record, ownScope);
+        if (destructor != nullptr) {
+            exportCxxDestructor(destructor, Record, ownScope);
+        }
+
+        for(const auto cls: classes) {
+            auto exportedScope = exportCxxRecord(cls, ownScope);
+            descriptornames["classes"].emplace(fmt::format("meta_{}", exportedScope.name));
+        }
+        for(const auto en: enums) {
+            auto exportedScope = exportEnum(en, ownScope);
+            descriptornames["enums"].emplace(fmt::format("meta_{}", exportedScope.name));
+        }
 
         for(const auto& [rangeName, range]: descriptornames) {
             wrap_range_in_tuple(rangeName, ownScope.inner, range);
         }
 
-        std::vector<std::string> genDeclRange;
+        /*std::vector<std::string> genDeclRange;
         for(const auto decl: decls) {
             auto exportedScope = exportDeclaration(decl, ownScope);
             if (!exportedScope.name.empty()) {
                 genDeclRange.emplace_back(fmt::format("meta_{}", exportedScope.name));
             }
-        }
+        }*/
 
         exportedMetaTypes.emplace_back(std::tuple(qualName, ownScope.qualifiedName));
-        wrap_range_in_tuple("decls", ownScope.inner, genDeclRange);
+        // wrap_range_in_tuple("decls", ownScope.inner, genDeclRange);
         return ownScope;
     }
 
