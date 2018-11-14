@@ -12,7 +12,7 @@ endif()
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 conan_cmake_run(CONANFILE conanfile.txt
                 BASIC_SETUP CMAKE_TARGETS
-                BUILD missing)
+                BUILD all)
 
 add_definitions(-DFMT_HEADER_ONLY) # global right now. should be added per target
                                    # use header only fmt as it's library is not compatible with older platforms
