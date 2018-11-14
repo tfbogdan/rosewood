@@ -7,5 +7,8 @@ namespace mc {
     DClassContainer::~DClassContainer() = default;
     DEnumContainer::~DEnumContainer() = default;
     DNamespace::~DNamespace() = default;
+    DParameter::~DParameter() = default;
+    DOverloadSet::~DOverloadSet() = default;
+    DMethod::~DMethod() = default;
     DClass::~DClass() = default;
 }

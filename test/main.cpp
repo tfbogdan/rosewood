@@ -113,3 +113,13 @@ TEST(mc, runtime_class) {
     EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
     EXPECT_TRUE(dynamicJinx->hasMethod("aMethod"));
 }
+
+TEST(mc, runtime_searches) {
+    using JinxModule = mc::DNamespaceWrapper<mc::meta_Jinx>;
+    JinxModule module;
+
+    EXPECT_NO_THROW(module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod"));
+    auto aMethodSet = module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod");
+    auto aMethod = aMethodSet->getMethods()[0];
+
+}

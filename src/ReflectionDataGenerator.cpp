@@ -210,6 +210,7 @@ namespace mc {
         auto methodScope = outerScope.spawn(name, methodQualName, "mc::Method");
         genMethodDispatcher(methodScope, method, record);
         methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
+        methodScope.putline("using class_type = meta_{};", method->getParent()->getNameAsString());
 
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
