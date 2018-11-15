@@ -20,30 +20,23 @@ struct range_model {
     using base_array_t = std::array<const baseType*, num_elements>;
     // the array initializer
     static constexpr auto array_initializer = [] () constexpr {
-        if constexpr (std::tuple_size<sourceTupleT>::value > 0) {
-            return std::apply([](const auto& ...elems) {
-                return base_array_t {
-                    ((&elems), ...)
-                };
-            }, wrapped_elements);
-        } else {
-            return base_array_t{};
-        }
+        return std::apply([](const auto& ...elems) {
+            base_array_t result = {};
+            int index(0);
+            ((result[index++] = &elems), ...);
+            return result;
+        }, wrapped_elements);
     };
 
     static constexpr base_array_t base_array = array_initializer();
 
     using map_type = std::unordered_map<std::string_view, const baseType*>;
     static constexpr auto map_initializer = [] () constexpr {
-        if constexpr (std::tuple_size<sourceTupleT>::value > 0) {
-            return std::apply([](const auto& ...elems) {
-                return map_type{
-                    (std::pair(elems.getName(), &elems), ...)
-                };
-            }, wrapped_elements);
-        } else {
-            return map_type{};
-        }
+        return std::apply([](const auto& ...elems) {
+            map_type result;
+            ((result[elems.getName()] = &elems), ...);
+            return result;
+        }, wrapped_elements);
     };
 
     static const map_type element_map;

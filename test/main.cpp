@@ -121,5 +121,5 @@ TEST(mc, runtime_searches) {
     EXPECT_NO_THROW(module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod"));
     auto aMethodSet = module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod");
     auto aMethod = aMethodSet->getMethods()[0];
-
+    (void) aMethod;
 }
