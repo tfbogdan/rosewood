@@ -189,3 +189,5 @@ Instantiating these is possible by using a series of templated wrappers that you
 
 
 ```
+
+Copyright (c) 2018 Bogdan Tudoran
