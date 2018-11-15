@@ -5,8 +5,13 @@
 #include <functional>
 #include <vector>
 #include <unordered_map>
+#include <stdexcept>
 
 namespace mc {
+
+    class const_corectness_error : public std::logic_error {
+        using std::logic_error::logic_error;
+    };
 
 namespace detail {
 
@@ -18,7 +23,6 @@ struct range_model {
     static constexpr int num_elements = std::tuple_size<sourceTupleT>::value;
 
     using base_array_t = std::array<const baseType*, num_elements>;
-    // the array initializer
     static constexpr auto array_initializer = [] () constexpr {
         return std::apply([](const auto& ...elems) {
             base_array_t result = {};
@@ -153,7 +157,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
          * @param args an array of arguments. Every argument is expected to be binary compatible to the argument list of the actual method wrapped by this instance. int to unsigned might work simply due to same binary representation ( sort of ) but a conversion from float to double will not happen through this API so use it with a lot of care (ideally hidden by a safer API)
          * noexcept guarantees simply cannot be made so expect this to throw anything at you as long as the wrapped method does so. nothing other than that, although that cannot be expressed in C++
          */
-        // virtual void call(void *object, void *retValAddr, void **args) const = 0;
+        virtual void call(const void *object, void *retValAddr, void **args) const = 0;
+        virtual void call(void *object, void *retValAddr, void **args) const = 0;
     private:
 
     };
@@ -170,19 +175,17 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         static constexpr parameter_model parameters {};
 
     public:
-        /*inline virtual void call(void *object, void *retValAddr, void **args) const final {
-            auto &Object = *static_cast<typename Descriptor::class_type*>(object);
-            int index = 0;
-            if constexpr (std::is_void<typename Descriptor::return_type>::value) {
-                std::apply([&index, &args, &Object](const auto& ...params){
-                    Descriptor::call(Object, ((static_cast<decltype(params)>(args[index++])), ...));
-                }, parameters);
+        virtual void call(const void *object, void *retValAddr, void **args) const final {
+            if constexpr (Descriptor::is_const) {
+                Descriptor::fastcall(object, retValAddr, args);
             } else {
-                *static_cast<typename Descriptor::return_type*>(retValAddr) = std::apply([&index, &args, &Object](const auto& ...params){
-                    return Descriptor::call(Object, ((*static_cast<decltype(params)*>(args[index++])), ...));
-                }, parameters);
+                throw const_corectness_error("non const method called on const object");
             }
-        }*/
+        }
+
+        inline virtual void call(void *object, void *retValAddr, void **args) const final {
+            Descriptor::fastcall(object, retValAddr, args);
+        }
 
     private:
     };

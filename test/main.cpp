@@ -121,5 +121,13 @@ TEST(mc, runtime_searches) {
     EXPECT_NO_THROW(module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod"));
     auto aMethodSet = module.findChildNamespace("jinx")->findChildClass("Jinx")->findOverloadSet("aMethod");
     auto aMethod = aMethodSet->getMethods()[0];
-    (void) aMethod;
+
+    int aMethodRes;
+    int aMethodArg = 12;
+    void *aMethodArgs[] = {&aMethodArg};
+    jinx::Jinx littleJinx("");
+
+    aMethod->call(&littleJinx, &aMethodRes, aMethodArgs);
+    EXPECT_EQ(aMethodRes, littleJinx.aMethod(aMethodArg));
+    EXPECT_THROW(aMethod->call(&static_cast<const jinx::Jinx&>(littleJinx), &aMethodRes, aMethodArgs), mc::const_corectness_error);
 }

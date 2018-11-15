@@ -203,14 +203,57 @@ namespace mc {
         descScope.putline("}};");
     }
 
+    void getFastMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
+        // this should be more elaborate and should consider all method attributes ( const and noexcept come to mind )
+        descScope.putline("static inline void fastcall (");
+
+        scope argList = descScope.inner.spawn();
+        const std::size_t numArgs = Method->param_size();
+        const auto &printingPolicy(Method->getASTContext().getPrintingPolicy());
+        argList.putline("{}void *obj,", Method->isConst() ? "const ": "");
+        argList.putline("[[maybe_unused]] void *retAddr,");
+        argList.putline("[[maybe_unused]] void **args) {{");
+        auto dispatcherBody = argList.spawn();
+        const bool isCtor(Method->getKind() == clang::Decl::Kind::CXXConstructor);
+
+        if (isCtor) {
+            dispatcherBody.putline("new (obj) {} ({}", Record->getQualifiedNameAsString(), numArgs > 0 ? "" : ");");
+        } else {
+            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", Record->getQualifiedNameAsString());
+            const auto returnType = Method->getReturnType();
+            const auto castType = returnType->isReferenceType() || returnType->isRValueReferenceType() ? returnType->getPointeeType() : returnType;
+            const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}*>(retAddr) = ", castType.getAsString(printingPolicy)));
+            dispatcherBody.putline("{}Object.{} ({}", returnType->isVoidType() ? "" : retAddrCastExpr, Method->getNameAsString(), numArgs > 0 ? "" : ");");
+        }
+
+        auto callArgList = dispatcherBody.spawn();
+
+        std::size_t index(0);
+        for (const auto arg: Method->parameters()) {
+            const auto argType = arg->getType();
+            const bool isRValue = argType->isRValueReferenceType();
+            const auto castType = argType->isReferenceType() || argType->isRValueReferenceType() ? argType->getPointeeType() : argType;
+            const std::string paramCastExpr(fmt::format("*reinterpret_cast<{}*>(args[{}])", castType.getAsString(printingPolicy), index));
+            callArgList.putline("{}{}{}{}", isRValue ? "std::move(" : "", paramCastExpr, isRValue ? ")": "" ,index < (numArgs - 1) ? ",": "");
+            ++index;
+        }
+        if (numArgs > 0) {
+            dispatcherBody.putline(");");
+        }
+        descScope.putline("}}");
+    }
+
+
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
         const auto methodQualName = method->getQualifiedNameAsString();
 
         auto methodScope = outerScope.spawn(name, methodQualName, "mc::Method");
         genMethodDispatcher(methodScope, method, record);
+        getFastMethodDispatcher(methodScope, method, record);
         methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
         methodScope.putline("using class_type = meta_{};", method->getParent()->getNameAsString());
+        methodScope.putline("static constexpr bool is_const = {};", method->isConst());
 
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
@@ -257,11 +300,11 @@ namespace mc {
         return opScope;
     }
 
-    descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where) {
+    descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &) {
 
     }
 
-    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where) {
+    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &) {
 
     }
 
