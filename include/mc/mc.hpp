@@ -111,6 +111,10 @@ namespace mc {
         constexpr std::string_view get_name() const noexcept {
             return descriptor::name;
         }
+
+        constexpr auto get_value() const noexcept {
+            return descriptor::value;
+        }
     };
 
     template<typename Descriptor>
