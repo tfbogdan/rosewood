@@ -300,13 +300,13 @@ namespace mc {
         return opScope;
     }
 
-    descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &) {
-
+    /*descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
+		return descriptor_scope(where.inner, "", "", "", "");
     }
 
-    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &) {
-
-    }
+    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
+		return descriptor_scope(where.inner, "", "", "", "");
+    }*/
 
     descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
         const auto methodQualName = overloads[0]->getQualifiedNameAsString();

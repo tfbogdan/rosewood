@@ -25,7 +25,7 @@ struct range_model {
     using base_array_t = std::array<const baseType*, num_elements>;
     static constexpr auto array_initializer = [] () constexpr {
         return std::apply([](const auto& ...elems) {
-            base_array_t result = {};
+            base_array_t result{};
             int index(0);
             ((result[index++] = &elems), ...);
             return result;

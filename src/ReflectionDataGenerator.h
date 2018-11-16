@@ -84,12 +84,13 @@ struct descriptor_scope {
         name(std::move(other.name)),
         qualName(std::move(other.qualName)),
         kind(std::move(other.kind)),
-        qualifiedName(std::move(other.kind)){
-        moved = true;
+        qualifiedName(std::move(other.kind)),
+		printed_header(other.printed_header) {
+        other.moved = true;
     }
 
     ~descriptor_scope() {
-        if (!name.empty()) {
+        if (!name.empty() && !moved) {
             print_header();
             outer.putline("}};", name);
         }

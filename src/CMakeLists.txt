@@ -30,7 +30,11 @@ target_link_libraries(mc
 	LLVMSupport
 )
 
-target_link_libraries(mc PRIVATE ${CLANG_LIBRARIES} CONAN_PKG::fmt CONAN_PKG::jsonformoderncpp stdc++fs)
+target_link_libraries(mc PRIVATE ${CLANG_LIBRARIES} CONAN_PKG::fmt CONAN_PKG::jsonformoderncpp)
+if (NOT WIN32) 
+	target_link_libraries(mc PRIVATE stdc++fs)
+endif(NOT WIN32)
+
 target_include_directories(mc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 target_compile_options(mc PRIVATE -fno-rtti)
 target_compile_features(mc PRIVATE cxx_std_17)

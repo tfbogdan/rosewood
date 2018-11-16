@@ -13,7 +13,7 @@ namespace jinx {
         moreJinx,
         superJinx = 100
     };
-
+	 
     typedef enum {
         firstEnum, secondOne, third = -3
     } UntypedEnum;
