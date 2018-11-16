@@ -14,7 +14,7 @@ namespace mc {
     };
 
 namespace detail {
-
+	
 template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
 struct range_model {
     using wrapped_elements_tuple = typename tuple_elements_wrapper<wrapperType, sourceTupleT>::type;
@@ -23,25 +23,25 @@ struct range_model {
     static constexpr int num_elements = std::tuple_size<sourceTupleT>::value;
 
     using base_array_t = std::array<const baseType*, num_elements>;
-    static constexpr auto array_initializer = [] () constexpr {
+    static constexpr auto array_initializer() {
         return std::apply([](const auto& ...elems) {
             base_array_t result{};
             int index(0);
             ((result[index++] = &elems), ...);
             return result;
         }, wrapped_elements);
-    };
+    }
 
     static constexpr base_array_t base_array = array_initializer();
 
     using map_type = std::unordered_map<std::string_view, const baseType*>;
-    static constexpr auto map_initializer = [] () constexpr {
+    static constexpr auto map_initializer() {
         return std::apply([](const auto& ...elems) {
             map_type result;
             ((result[elems.getName()] = &elems), ...);
             return result;
         }, wrapped_elements);
-    };
+    }
 
     static const map_type element_map;
 };
@@ -264,7 +264,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using enum_range = detail::range_model<typename MetaClass::enums, DEnum, DEnumWrapper>;
         static constexpr enum_range enums = {};
 
-        using class_range = detail::range_model<typename MetaClass::classes, DClass, DClassWrapper>;
+		template<typename T>
+		using disambiguator = DClassWrapper<T>;
+
+        using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
         static constexpr class_range classes = {};
 
         using overload_set_model = detail::range_model<typename descriptor::overload_sets, DOverloadSet, DOverloadSetWrapper>;
@@ -323,7 +326,9 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using class_range = detail::range_model<typename MetaNamespace::classes, DClass, DClassWrapper>;
         static constexpr class_range classes = {};
 
-        using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, DNamespaceWrapper>;
+		template <typename T>
+		using disambiguator = DNamespaceWrapper<T>;
+        using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, disambiguator>;
         static constexpr namespaces_model namespaces {};
     };
 
