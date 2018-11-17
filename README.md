@@ -55,7 +55,7 @@ superJinx: 100
 
 ## Getting started
 
-As of now there is no binary distribution of this suite so you'll have to build it from source. It relies on standard C++ 17 so it should compile on any platform with a working C++17 compiler and if it doesn't it will be hastily resolved once reported. You'll also need:
+Please check the releases page for binary distributions. If you can't find any suitable you can always compile from source as long as you have a C++17 compiler and the following prerequisites: 
 
 - A recent (7+) version of the clang libraries, and I mean the C++ libraries not the C wrapper. You'll be able to find precompiled binaries for a wide range of platforms at the [LLVM Release page](http://releases.llvm.org/download.html#7.0.0). If you're not on one of the targeted platforms then don't despair as it's quite easy to compile LLVM and Clang from source. Follow the [LLVM Getting Started guide](https://llvm.org/docs/GettingStarted.html) and you'll be up and running in a heartbeat. You'll find the trickyest part of building them is having the patience for the build to be over and (be warned!) if compiling debug binaries finding the disk space necessary.
 - Conan, as the rest of dependencies are fortunately available in conan center. Installing conan is as simple as `pip install conan`.
