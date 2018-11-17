@@ -105,7 +105,7 @@ namespace mc {
 
     void ReflectionDataGenerator::Generate() {
         printingPolicy = context.getPrintingPolicy();
-        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), mcModuleName.getValue(), "mc::Module");
+        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), "mc::Module");
 
         std::vector<std::string> exportedNamespaces;
         std::vector<std::string> exportedEnums;
@@ -125,15 +125,15 @@ namespace mc {
                 case clang::Decl::Kind::CXXRecord: {
                     auto record = static_cast<const clang::CXXRecordDecl*>(decl);
                     if (record->isThisDeclarationADefinition()) {
-                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), module_scope).name));
+                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(record->getNameAsString(), record, module_scope).name));
                     }
                 } break;
                 case clang::Decl::Kind::ClassTemplateSpecialization: {
-                    auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
+                    // auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
                     // this is just a test. it's not expected to work due to template naming
-                    if(specialization->isThisDeclarationADefinition()) {
-                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, module_scope).name));
-                    }
+                    // if(specialization->isThisDeclarationADefinition()) {
+                    //    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, module_scope).name));
+                    // }
                 } break;
                 default:
                     // report?
@@ -158,14 +158,14 @@ namespace mc {
         case clang::Decl::Kind::CXXRecord: {
             auto record = static_cast<const clang::CXXRecordDecl*>(Decl);
             if (record->isThisDeclarationADefinition()) {
-                return exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(Decl), where);
+                return exportCxxRecord(record->getNameAsString(), record, where);
             }
         } break;
         default:
             break;
         }
         // TDO: Once we have better coverage of declaration types, this should become a throw
-        return where.spawn("", "", "");
+        return where.spawn("", "");
     }
 
 
@@ -186,13 +186,14 @@ namespace mc {
         if (isCtor) {
             dispatcherBody.putline("new (obj) {} ({}", thisTypeName, numArgs > 0 ? "" : ");");
         } else if (isDtor) {
-            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", thisTypeName);
+            dispatcherBody.putline("{1}{0} &Object = *reinterpret_cast<{1}{0}*>(obj);", thisTypeName, Method->isConst() ? "const ": "");
             dispatcherBody.putline("Object.~{}();", Record->getNameAsString());
         } else {
-            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", thisTypeName);
+            dispatcherBody.putline("{1}{0} &Object = *reinterpret_cast<{1}{0}*>(obj);", thisTypeName, Method->isConst() ? "const ": "");
             const auto returnType = Method->getReturnType();
+            const bool isReferenceType = returnType->isReferenceType() || returnType->isRValueReferenceType();
             const auto castType = returnType->isReferenceType() || returnType->isRValueReferenceType() ? returnType->getPointeeType() : returnType;
-            const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}*>(retAddr) = ", castType.getAsString(printingPolicy)));
+            const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}{}*>(retAddr) = {}", castType.getAsString(printingPolicy), isReferenceType ? "*": "", isReferenceType? "&": ""));
             dispatcherBody.putline("{}Object.{} ({}", returnType->isVoidType() ? "" : retAddrCastExpr, Method->getNameAsString(), numArgs > 0 ? "" : ");");
         }
 
@@ -203,7 +204,7 @@ namespace mc {
             const auto argType = arg->getType();
             const bool isRValue = argType->isRValueReferenceType();
             const auto castType = argType->isReferenceType() || argType->isRValueReferenceType() ? argType->getPointeeType() : argType;
-            const std::string paramCastExpr(fmt::format("*reinterpret_cast<{}*>(args[{}])", castType.getAsString(printingPolicy), index));
+            const std::string paramCastExpr(fmt::format("*reinterpret_cast<{}*>(args[{}])", castType.getCanonicalType().getAsString(printingPolicy), index));
             callArgList.putline("{}{}{}{}", isRValue ? "std::move(" : "", paramCastExpr, isRValue ? ")": "" ,index < (numArgs - 1) ? ",": "");
             ++index;
         }
@@ -216,19 +217,16 @@ namespace mc {
 
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
-        const auto methodQualName = method->getQualifiedNameAsString();
-
-        auto methodScope = outerScope.spawn(name, methodQualName, "mc::Method");
+        auto methodScope = outerScope.spawn(name, "mc::Method");
         getFastMethodDispatcher(methodScope, method, record);
         methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
-        methodScope.putline("using class_type = meta_{};", method->getParent()->getNameAsString());
         methodScope.putline("static constexpr bool is_const = {};", method->isConst());
 
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
             auto parmName = (param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
-            auto paramScope = methodScope.spawn(parmName, parmName, "mc::Parameter");
-            paramScope.putline("using type = {};", param->getType().getAsString(printingPolicy));
+            auto paramScope = methodScope.spawn(parmName, "mc::Parameter");
+            paramScope.putline("using type = {};", param->getType().getCanonicalType().getAsString(printingPolicy));
             parameters.emplace_back(fmt::format("meta_{}", parmName));
         }
         wrap_range_in_tuple("parameters", methodScope.inner, parameters);
@@ -236,9 +234,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        // the unwanted methods have already been filtered out at this point so it's just a straightforward export
-        const auto methodQualName = overloads[0]->getQualifiedNameAsString();
-        auto overloadScope = outerScope.spawn(name, methodQualName, "mc::OverloadSet");
+        auto overloadScope = outerScope.spawn(name, "mc::OverloadSet");
 
         std::vector<std::string> overloadNames;
 
@@ -252,9 +248,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        const auto qualName = overloads[0]->getQualifiedNameAsString();
-        auto opScope = outerScope.spawn(name, qualName, "mc::Operator");
-
+        auto opScope = outerScope.spawn(name, "mc::Operator");
         std::vector<std::string> overloadNames;
 
         for(const auto Method: overloads) {
@@ -278,9 +272,8 @@ namespace mc {
     }*/
 
     descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
-        const auto methodQualName = overloads[0]->getQualifiedNameAsString();
         static const std::string name = "constructor";
-        auto overloadScope = outerScope.spawn(name, methodQualName, "mc::ConstructorSet");
+        auto overloadScope = outerScope.spawn(name, "mc::ConstructorSet");
 
         std::vector<std::string> overloadNames;
 
@@ -299,17 +292,15 @@ namespace mc {
 
     void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
         for(const auto& field: fields) {
-            auto fieldScope = outerScope.spawn(field->getNameAsString(), field->getQualifiedNameAsString(), "mc::Field");
+            auto fieldScope = outerScope.spawn(field->getNameAsString(), "mc::Field");
             printingPolicy.FullyQualifiedName = true;
             fieldScope.putline("using type = {};", field->getType().getCanonicalType().getAsString(printingPolicy));
         }
     }
 
 
-    descriptor_scope ReflectionDataGenerator::exportCxxRecord(const clang::CXXRecordDecl *Record, descriptor_scope &where) {
-        auto qualName = Record->getQualifiedNameAsString();
-        auto name = Record->getNameAsString();
-        auto ownScope = where.spawn(name, qualName, "mc::Class");
+    descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
+        auto ownScope = where.spawn(name, "mc::Class");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
         std::map<std::string_view, std::set<std::string>> descriptornames = {
             {"classes", {}},
@@ -406,7 +397,7 @@ namespace mc {
         }
 
         for(const auto cls: classes) {
-            auto exportedScope = exportCxxRecord(cls, ownScope);
+            auto exportedScope = exportCxxRecord(cls->getNameAsString(), cls, ownScope);
             descriptornames["classes"].emplace(fmt::format("meta_{}", exportedScope.name));
         }
         for(const auto en: enums) {
@@ -439,12 +430,12 @@ namespace mc {
             qualName = Enum->getTypedefNameForAnonDecl()->getQualifiedNameAsString();
         }
 
-        auto ownScope = where.spawn(name, qualName, "mc::Enum");
+        auto ownScope = where.spawn(name, "mc::Enum");
         ownScope.putline("using type = {};", qualName);
         std::vector<clang::EnumConstantDecl*> enumerators;
         for(const auto enumerator: Enum->enumerators()) {
             auto enName = enumerator->getNameAsString();
-            auto enScope = ownScope.spawn(enName, enumerator->getQualifiedNameAsString(), "mc::Enumerator");
+            auto enScope = ownScope.spawn(enName, "mc::Enumerator");
             enScope.putline("static constexpr {} value = {};", Enum->getIntegerType().getTypePtrOrNull() ? Enum->getIntegerType().getAsString(printingPolicy) : "int",enumerator->getInitVal().toString(10));
             enumerators.push_back(enumerator);
         }
@@ -457,7 +448,7 @@ namespace mc {
     descriptor_scope ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
-        auto ownScope = where.spawn(name, qualName, "mc::Namespace");
+        auto ownScope = where.spawn(name, "mc::Namespace");
 
         ownScope.print_header();
 
@@ -476,7 +467,7 @@ namespace mc {
             case clang::Decl::Kind::CXXRecord: {
                 auto record = static_cast<const clang::CXXRecordDecl*>(decl);
                 if (record->isThisDeclarationADefinition()) {
-                    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), ownScope).name));
+                    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(record->getNameAsString()  , record, ownScope).name));
                 }
             } break;
             /*case clang::Decl::Kind::ClassTemplate: {
@@ -500,7 +491,7 @@ namespace mc {
                         auto specT = specialization->getTypeForDecl();
                         const bool incompleteType = specT->isIncompleteType();
                         sema.RequireCompleteType(alias->getLocation(), clang::QualType(specialization->getTypeForDecl(), 0), 1);
-                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization->getDefinition(), ownScope).name));
+                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(alias->getNameAsString(), specialization->getDefinition(), ownScope).name));
                     }
                 }
             };

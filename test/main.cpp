@@ -118,3 +118,15 @@ TEST(mc, runtime_searches) {
     EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
     EXPECT_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs), mc::const_corectness_error);
 }
+
+TEST(mc, string_wrap) {
+    using TemplateDeclarations = mc::DNamespaceWrapper<mc::meta_TemplateDeclarations>;
+    TemplateDeclarations module;
+    auto tdNamespace = module.findChildNamespace("td");
+    auto strWrapper = tdNamespace->findChildClass("WrappedString");
+    const std::string testString = "Hello World!";
+    char *res;
+    auto cStr = strWrapper->findOverloadSet("c_str")->getMethods()[0];
+    cStr->call(&testString, &res, nullptr);
+    EXPECT_EQ(testString, res);
+}
