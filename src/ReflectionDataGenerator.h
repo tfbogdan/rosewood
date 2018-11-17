@@ -6,6 +6,7 @@
 #pragma warning(push, 0)
 #include <clang/AST/AST.h>
 #include <llvm/Support/CommandLine.h>
+#include <clang/Sema/Sema.h>
 #pragma warning(pop)
 
 #include <fstream>
@@ -142,7 +143,7 @@ private:
     class ReflectionDataGenerator {
 
     public:
-        explicit ReflectionDataGenerator(const clang::ASTContext &astContext);
+        explicit ReflectionDataGenerator(clang::ASTContext &astContext, clang::Sema &sema);
         ~ReflectionDataGenerator();
 
         void Generate();
@@ -173,7 +174,8 @@ private:
 
         std::vector<std::tuple<std::string, std::string>> exportedMetaTypes; // all enums and classes get one of these. more to come
 
-        const clang::ASTContext &context;
+        clang::ASTContext &context;
+        clang::Sema &sema;
         clang::PrintingPolicy printingPolicy;
     };
 

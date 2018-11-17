@@ -41,11 +41,12 @@ namespace mc {
     namespace fs = std::experimental::filesystem;
 
 
-    ReflectionDataGenerator::ReflectionDataGenerator(const clang::ASTContext &astContext)
+    ReflectionDataGenerator::ReflectionDataGenerator(clang::ASTContext &astContext, clang::Sema &Sema)
         :out(mcOutput),
         idman(astContext.getPrintingPolicy()),
         idrepo(),
         context(astContext),
+        sema(Sema),
         printingPolicy(astContext.getPrintingPolicy()) {
 
         global_scope.putline("#pragma once");
@@ -491,9 +492,17 @@ namespace mc {
             } break;*/
             case clang::Decl::TypeAlias: {
                 auto alias = static_cast<clang::TypeAliasDecl*>(decl);
-                // if (alias->get)) {
-
-                // }
+                auto aliasedType = alias->getUnderlyingType();
+                if (aliasedType->isRecordType()) {
+                    auto record = aliasedType->getAsCXXRecordDecl();
+                    if (record->getKind() == clang::Decl::Kind::ClassTemplateSpecialization) {
+                        auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(record);
+                        auto specT = specialization->getTypeForDecl();
+                        const bool incompleteType = specT->isIncompleteType();
+                        sema.RequireCompleteType(alias->getLocation(), clang::QualType(specialization->getTypeForDecl(), 0), 1);
+                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization->getDefinition(), ownScope).name));
+                    }
+                }
             };
             default:
                 // report?

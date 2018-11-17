@@ -36,10 +36,10 @@ namespace mc {
 
     class MetadataTransformingConsumer : public clang::ASTConsumer {
     public:
-        MetadataTransformingConsumer(const clang::ASTContext &context);
+        MetadataTransformingConsumer(clang::CompilerInstance &CI);
         virtual void HandleTranslationUnit(clang::ASTContext &Context);
     private:
-        ReflectionDataGenerator generator;
+        clang::CompilerInstance &compilerInstance;
     };
 }
 

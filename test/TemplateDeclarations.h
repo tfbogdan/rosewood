@@ -6,6 +6,7 @@ namespace td {
 
 template <typename T>
 class SimpleTemplate {      // this shouldn't be exported
+public:
     T value;
 };
 
@@ -16,6 +17,6 @@ private:
     std::string aMember = "";
 };
 
-using SimpleTemplateInstance = SimpleTemplate<float>;   // but this should be exported as if SimpleTemplate<float> is a class called SimpleTemplateInstance
+using SimpleTemplateInstance = SimpleTemplate<int>;   // but this should be exported as if SimpleTemplate<float> is a class called SimpleTemplateInstance
 
 }

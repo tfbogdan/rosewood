@@ -29,18 +29,21 @@ namespace mc {
 
     std::unique_ptr<clang::ASTConsumer> MetadataGenerateAction::CreateASTConsumer(clang::CompilerInstance &Compiler, [[maybe_unused]] llvm::StringRef InFile) {
         compiler = &Compiler;
-        return std::make_unique<MetadataTransformingConsumer>(Compiler.getASTContext());
+        return std::make_unique<MetadataTransformingConsumer>(Compiler);
     }
 
-    bool MetadataGenerateAction::BeginInvocation(clang::CompilerInstance &CI) {        
+    bool MetadataGenerateAction::BeginInvocation(clang::CompilerInstance &CI) {
         return ASTFrontendAction::BeginInvocation(CI);
     }
 
-    MetadataTransformingConsumer::MetadataTransformingConsumer(const clang::ASTContext &context)
-        :generator(context) {}
+    MetadataTransformingConsumer::MetadataTransformingConsumer(clang::CompilerInstance &CI)
+        :compilerInstance(CI) {}
 
     void MetadataTransformingConsumer::HandleTranslationUnit(clang::ASTContext &context) {
+        ReflectionDataGenerator generator(compilerInstance.getASTContext(), compilerInstance.getSema());
+
         clang::PrintingPolicy ppCopy(context.getPrintingPolicy());
+
         ppCopy.SuppressUnwrittenScope = false;
         ppCopy.TerseOutput = false;
         context.setPrintingPolicy(ppCopy);
