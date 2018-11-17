@@ -115,6 +115,7 @@ struct descriptor_scope {
 
     void print_header() {
         if (!printed_header && !name.empty()) {
+            outer.putline("");
             outer.putline("struct meta_{} : public {}<meta_{}> {{", name, kind, name);
             inner.putline("static constexpr std::string_view name = \"{}\";", name);
             printed_header = true;

@@ -127,6 +127,13 @@ namespace mc {
                         exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), module_scope).name));
                     }
                 } break;
+                case clang::Decl::Kind::ClassTemplateSpecialization: {
+                    auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
+                    // this is just a test. it's not expected to work due to template naming
+                    if(specialization->isThisDeclarationADefinition()) {
+                        exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, module_scope).name));
+                    }
+                } break;
                 default:
                     // report?
                     break;
@@ -215,9 +222,13 @@ namespace mc {
         argList.putline("[[maybe_unused]] void **args) {{");
         auto dispatcherBody = argList.spawn();
         const bool isCtor(Method->getKind() == clang::Decl::Kind::CXXConstructor);
+        const bool isDtor(Method->getKind() == clang::Decl::Kind::CXXDestructor);
 
         if (isCtor) {
             dispatcherBody.putline("new (obj) {} ({}", Record->getQualifiedNameAsString(), numArgs > 0 ? "" : ");");
+        } else if (isDtor) {
+            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", Record->getQualifiedNameAsString());
+            dispatcherBody.putline("Object.~{}();", Record->getNameAsString());
         } else {
             dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", Record->getQualifiedNameAsString());
             const auto returnType = Method->getReturnType();
@@ -331,7 +342,8 @@ namespace mc {
     void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
         for(const auto& field: fields) {
             auto fieldScope = outerScope.spawn(field->getNameAsString(), field->getQualifiedNameAsString(), "mc::Field");
-            fieldScope.putline("using type = {};", field->getType().getAsString(printingPolicy));
+            printingPolicy.FullyQualifiedName = true;
+            fieldScope.putline("using type = {};", field->getType().getCanonicalType().getAsString(printingPolicy));
         }
     }
 
@@ -415,7 +427,9 @@ namespace mc {
             }
         }
 
-        exportCxxConstructors(constructors, Record, ownScope);
+        if (constructors.size()) {
+            exportCxxConstructors(constructors, Record, ownScope);
+        }
         for(const auto &[grpName, grp]: method_groups) {
             exportCxxMethodGroup(grpName, Record, grp, ownScope);
         }
@@ -500,6 +514,18 @@ namespace mc {
                 auto record = static_cast<const clang::CXXRecordDecl*>(decl);
                 if (record->isThisDeclarationADefinition()) {
                     exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), ownScope).name));
+                }
+            } break;
+            case clang::Decl::Kind::ClassTemplate: {
+                auto ctemplate = static_cast<clang::ClassTemplateDecl*>(decl);
+
+            } break;
+            case clang::Decl::Kind::ClassTemplateSpecialization: {
+                auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
+
+                // this is just a test. it's not expected to work due to template naming
+                if(specialization->isThisDeclarationADefinition()) {
+                    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, ownScope).name));
                 }
             } break;
             default:
