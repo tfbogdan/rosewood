@@ -34,5 +34,5 @@ configure_file(cmake/CMakeMcInformation.cmake.in lib/cmake/mc/CMakeMcInformation
 configure_file(cmake/CMakeTestMcCompiler.cmake.in lib/cmake/mc/CMakeTestMcCompiler.cmake @ONLY)
 
 export(TARGETS mc mcruntime FILE lib/cmake/mc/mc-exports.cmake)
-install(EXPORT mc-exports DESTINATION lib/cmake/mc NAMESPACE mc)
+install(EXPORT mc-exports DESTINATION lib/cmake/mc)
 install(FILES ${PROJECT_BINARY_DIR}/lib/cmake/mc/mc-config.cmake DESTINATION lib/cmake/mc)
