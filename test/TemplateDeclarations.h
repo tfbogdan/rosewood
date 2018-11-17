@@ -18,6 +18,6 @@ private:
 };
 
 using SimpleTemplateInstance = SimpleTemplate<float>;   // but this should be exported as if SimpleTemplate<float> is a class called SimpleTemplateInstance
-using WrappedString = std::basic_string<char>;
+using WrappedString = std::string;
 
 }
