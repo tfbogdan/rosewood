@@ -2,7 +2,7 @@
 set(CLANG_LIBRARIES clangFrontend clangDriver clangParse clangSema)
 set(CLANG_LIBRARIES ${CLANG_LIBRARIES} clangAST clangLex clangBasic clangTooling )
 
-add_executable(mc 
+add_executable(mc
 	main.cpp
 	ClangInfrastructure.h
 	ClangInfrastructure.cpp
@@ -31,7 +31,7 @@ target_link_libraries(mc
 )
 
 target_link_libraries(mc PRIVATE ${CLANG_LIBRARIES} CONAN_PKG::fmt CONAN_PKG::jsonformoderncpp)
-if (NOT WIN32) 
+if (NOT WIN32)
 	target_link_libraries(mc PRIVATE stdc++fs)
 endif(NOT WIN32)
 
@@ -41,7 +41,7 @@ target_compile_features(mc PRIVATE cxx_std_17)
 
 install(
 	TARGETS mc
-	EXPORT mc
+	EXPORT mc-exports
   RUNTIME
 		DESTINATION bin
 )
