@@ -1,5 +1,7 @@
 #include "BasicDefinitions.h"
 #include "BasicDefinitions.metadata.h"
+#include "TemplateDeclarations.h"
+#include "TemplateDeclarations.metadata.h"
 
 #include <mc/dynamic_mc.hpp>
 #include <functional>

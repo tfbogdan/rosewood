@@ -168,48 +168,6 @@ namespace mc {
     }
 
 
-    void genMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
-        // this should be more elaborate and should consider all method attributes ( is const for example )
-        descScope.putline("static constexpr auto call = [] (");
-
-        scope argList = descScope.inner.spawn();
-        const std::size_t numArgs = Method->param_size();
-        const bool isConstructor = Method->getKind() == clang::Decl::Kind::CXXConstructor;
-        const bool isImplicit = Method->isImplicit();
-        if (isConstructor) {
-            argList.putline("void *addr{}", numArgs > 0 ? ",": ") {");
-        } else {
-            argList.putline("{}{}& obj{}", Method->isConst() ? "const ": "", Record->getQualifiedNameAsString(), numArgs > 0 ? ",": ") {");
-        }
-
-        std::size_t index(0);
-        for (const auto arg: Method->parameters()) {
-            argList.putline("{} {}{}", arg->getType().getAsString(Method->getASTContext().getPrintingPolicy()),  isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": ") {");
-            ++index;
-        }
-        auto lambdaBody = argList.spawn();
-
-        if (isConstructor) {
-            lambdaBody.putline("new (addr) {} {}", Record->getQualifiedNameAsString(), numArgs > 0 ? "(": ";");
-        } else {
-            lambdaBody.putline("return obj.{} ({}", Method->getNameAsString(), numArgs > 0 ? "" : ");");
-        }
-        auto callArgList = lambdaBody.spawn();
-        index = 0;
-        for (const auto arg: Method->parameters()) {
-            if (arg->getType()->isRValueReferenceType()) {
-                callArgList.putline("std::move({}){}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
-            } else {
-                callArgList.putline("{}{}", isImplicit ? fmt::format("implicit_arg_{}", index) : arg->getNameAsString(), index < (numArgs - 1) ? ",": "");
-            }
-            ++index;
-        }
-        if (numArgs > 0) {
-            lambdaBody.putline(");");
-        }
-        descScope.putline("}};");
-    }
-
     void getFastMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
         // this should be more elaborate and should consider all method attributes ( const and noexcept come to mind )
         descScope.putline("static inline void fastcall (");
@@ -223,14 +181,14 @@ namespace mc {
         auto dispatcherBody = argList.spawn();
         const bool isCtor(Method->getKind() == clang::Decl::Kind::CXXConstructor);
         const bool isDtor(Method->getKind() == clang::Decl::Kind::CXXDestructor);
-
+        const auto thisTypeName = clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy);
         if (isCtor) {
-            dispatcherBody.putline("new (obj) {} ({}", Record->getQualifiedNameAsString(), numArgs > 0 ? "" : ");");
+            dispatcherBody.putline("new (obj) {} ({}", thisTypeName, numArgs > 0 ? "" : ");");
         } else if (isDtor) {
-            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", Record->getQualifiedNameAsString());
+            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", thisTypeName);
             dispatcherBody.putline("Object.~{}();", Record->getNameAsString());
         } else {
-            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", Record->getQualifiedNameAsString());
+            dispatcherBody.putline("{0} &Object = *reinterpret_cast<{0}*>(obj);", thisTypeName);
             const auto returnType = Method->getReturnType();
             const auto castType = returnType->isReferenceType() || returnType->isRValueReferenceType() ? returnType->getPointeeType() : returnType;
             const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}*>(retAddr) = ", castType.getAsString(printingPolicy)));
@@ -260,7 +218,6 @@ namespace mc {
         const auto methodQualName = method->getQualifiedNameAsString();
 
         auto methodScope = outerScope.spawn(name, methodQualName, "mc::Method");
-        genMethodDispatcher(methodScope, method, record);
         getFastMethodDispatcher(methodScope, method, record);
         methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
         methodScope.putline("using class_type = meta_{};", method->getParent()->getNameAsString());
@@ -352,7 +309,7 @@ namespace mc {
         auto qualName = Record->getQualifiedNameAsString();
         auto name = Record->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Class");
-        ownScope.putline("using type = {};", Record->getQualifiedNameAsString());
+        ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
         std::map<std::string_view, std::set<std::string>> descriptornames = {
             {"classes", {}},
             {"overload_sets", {}},
@@ -424,7 +381,11 @@ namespace mc {
             default:
                 // decls.push_back(decl);
                 break;
-            }
+            }        std::vector<std::string> exportedNamespaces;
+            std::vector<std::string> exportedEnums;
+            std::vector<std::string> exportedClasses;
+
+
         }
 
         if (constructors.size()) {
@@ -464,7 +425,7 @@ namespace mc {
             }
         }*/
 
-        exportedMetaTypes.emplace_back(std::tuple(qualName, ownScope.qualifiedName));
+        exportedMetaTypes.emplace_back(std::tuple(clang::QualType(Record->getTypeForDecl(),0).getAsString(printingPolicy), ownScope.qualifiedName));
         // wrap_range_in_tuple("decls", ownScope.inner, genDeclRange);
         return ownScope;
     }
@@ -497,6 +458,7 @@ namespace mc {
         auto name = Namespace->getNameAsString();
         auto ownScope = where.spawn(name, qualName, "mc::Namespace");
 
+        ownScope.print_header();
 
         std::vector<std::string> exportedNamespaces;
         std::vector<std::string> exportedEnums;
@@ -516,18 +478,23 @@ namespace mc {
                     exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(static_cast<const clang::CXXRecordDecl*>(decl), ownScope).name));
                 }
             } break;
-            case clang::Decl::Kind::ClassTemplate: {
+            /*case clang::Decl::Kind::ClassTemplate: {
                 auto ctemplate = static_cast<clang::ClassTemplateDecl*>(decl);
 
             } break;
             case clang::Decl::Kind::ClassTemplateSpecialization: {
                 auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
-
                 // this is just a test. it's not expected to work due to template naming
                 if(specialization->isThisDeclarationADefinition()) {
                     exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, ownScope).name));
                 }
-            } break;
+            } break;*/
+            case clang::Decl::TypeAlias: {
+                auto alias = static_cast<clang::TypeAliasDecl*>(decl);
+                // if (alias->get)) {
+
+                // }
+            };
             default:
                 // report?
                 break;
