@@ -99,10 +99,26 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     };
 
     class DNamespace;
+    class DClass;
+    class DEnum;
+    class DOverloadSet;
+    class DMethod;
+    class DEnumerator;
+    class DField;
+
     class DMetaDecl {
     public:
         virtual ~DMetaDecl() = 0;
         virtual std::string_view getName() const noexcept = 0;
+        // virtual std::string_view getQualifiedName() const noexcept = 0;
+
+        virtual const DNamespace *asNamespace() const noexcept;
+        virtual const DClass *asClass() const noexcept;
+        virtual const DEnum *asEnum() const noexcept;
+        virtual const DEnumerator *asEnumerator() const noexcept;
+        virtual const DOverloadSet *asOverloadSet() const noexcept;
+        virtual const DMethod *asMethod() const noexcept;
+        virtual const DField *asField() const noexcept;
     };
 
     class DClass;
@@ -144,6 +160,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DEnum : public DMetaDecl {
     public:
         virtual ~DEnum() = 0;
+        virtual const DEnum *asEnum() const noexcept final;
     private:
     };
 
@@ -309,6 +326,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         virtual bool hasMethod(std::string_view name) const noexcept = 0;
         virtual const DOverloadSet *findOverloadSet(std::string_view name) const noexcept(false) = 0;
         virtual const DField *findField(std::string_view name) const noexcept(false) = 0;
+        virtual const DClass *asClass() const noexcept final;
     private:
     };
 
