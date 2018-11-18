@@ -76,6 +76,9 @@ namespace mc {
 
     template<typename T>
     struct meta;
+
+    template<typename T>
+    struct Type {};
     
     template<typename Descriptor>
     struct Module {};

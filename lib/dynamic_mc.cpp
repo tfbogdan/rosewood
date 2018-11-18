@@ -2,6 +2,7 @@
 
 
 namespace mc {
+    DType::~DType() = default;
     DMetaDecl::~DMetaDecl() = default;
     DEnum::~DEnum() = default;
     DField::~DField() = default;

@@ -54,8 +54,35 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
 
 }
 
-    class DNamespace;
+    class DType {
+    public:
+        virtual ~DType() = 0;
+        /**
+         * @brief getCanonicalName provides the canonical name of this type. eg, for std::string view it is std::basic_string<char>
+         * @return
+         */
+        virtual std::string_view getCanonicalName() const = 0;
+        /**
+         * @brief getName returns the readable name of a type, exactly as it was typed by it's user.
+         * @return
+         */
+        virtual std::string_view getName() const = 0;
+        /**
+         * @brief getAtomicName returns the name of the underlying type after decomosition: dropping of qualifiers and pointers and references. For const std:string&, that would be std::string
+         * @return
+         */
+        virtual std::string_view getAtomicName() const = 0;
+    };
 
+    template <typename Descriptor>
+    class DTypeWrapper {
+    public:
+        inline virtual ~DTypeWrapper() = default;
+    private:
+
+    };
+
+    class DNamespace;
     class DMetaDecl {
     public:
         virtual ~DMetaDecl() = 0;

@@ -9,6 +9,8 @@ namespace td {
 template <typename T>
 class SimpleTemplate {      // this shouldn't be exported
 public:
+    inline std::string stringReturningFoo() {return std::string();}
+
     T value;
 };
 

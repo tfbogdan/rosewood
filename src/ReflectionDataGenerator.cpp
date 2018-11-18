@@ -227,21 +227,33 @@ namespace mc {
         descScope.putline("}}");
     }
 
+    descriptor_scope ReflectionDataGenerator::exportType(const std::string &exportAs, clang::QualType type, descriptor_scope &where) {
+        auto ownScope = where.spawn(exportAs, "mc::Type");
+        const auto canonicalTypeName = type.getCanonicalType().getAsString(printingPolicy);
+        ownScope.putline("using canonical_type = {};", canonicalTypeName);
+        ownScope.putline("static constexpr std::string_view canonical_type_name = \"{}\";", canonicalTypeName);
 
+        const auto plainTypeName = type.getAsString(printingPolicy);
+        ownScope.putline("static constexpr std::string_view plain_type_name = \"{}\";", plainTypeName);
+
+        const auto atomicTypeName = getUnitType(type).getCanonicalType().getAsString(printingPolicy);
+        ownScope.putline("using atomic_type = {};", atomicTypeName);
+        ownScope.putline("static constexpr std::string_view atomic_type_name = \"{}\";", atomicTypeName);
+        return ownScope;
+    }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
         auto methodScope = outerScope.spawn(name, "mc::Method");
         getFastMethodDispatcher(methodScope, method, record);
-        methodScope.putline("using return_type = {};", method->getReturnType().getCanonicalType().getAsString(printingPolicy));
+
+        exportType("return_type", method->getReturnType(), methodScope);
         methodScope.putline("static constexpr bool is_const = {};", method->isConst());
 
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
             auto parmName = (param->getDeclName().isEmpty() || param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
             auto paramScope = methodScope.spawn(parmName, "mc::Parameter");
-            paramScope.putline("using type = {};", param->getType().getCanonicalType().getAsString(printingPolicy));
-            paramScope.putline("static constexpr std::string_view type_name = \"{}\";", param->getType().getCanonicalType().getAsString(printingPolicy));
-            paramScope.putline("static constexpr std::string_view unittype_name = \"{}\";", getUnitType(param->getType()).getCanonicalType().getAsString(printingPolicy));
+            exportType("type", param->getType(), paramScope);
             parameters.emplace_back(fmt::format("meta_{}", parmName));
         }
         wrap_range_in_tuple("parameters", methodScope.inner, parameters);
@@ -503,8 +515,6 @@ namespace mc {
                     auto record = aliasedType->getAsCXXRecordDecl();
                     if (record->getKind() == clang::Decl::Kind::ClassTemplateSpecialization) {
                         auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(record);
-                        auto specT = specialization->getTypeForDecl();
-                        const bool incompleteType = specT->isIncompleteType();
                         sema.RequireCompleteType(alias->getLocation(), clang::QualType(specialization->getTypeForDecl(), 0), 1);
                         exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(alias->getNameAsString(), specialization->getDefinition(), ownScope).name));
                     }

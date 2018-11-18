@@ -132,4 +132,5 @@ TEST(mc, string_wrap) {
     EXPECT_EQ(testString, res);
 
     static_assert(std::is_same<mc::const_ref<int>::type, const int&>::value);
+    static_assert (std::is_same<mc::const_ref<int>::atomic_type, int>::value);
 }
