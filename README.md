@@ -13,7 +13,7 @@ find_package(mc REQUIRED)
 metacompile_header(<your target> <your header file>)
 ```
 
-That's it! Check out the [export rules](docs/export_rules.md) that are used when the tool applies.Doing that alone and then including the generated file in your code is all you need to have full compile time access over the definitions in the header. If you do not want runtime access (or you don't find the way it is provided by this framework suitable and you'd rather build your own representation of it using the compile time model) then you don't even need to link any libraries (_This is only partly true today but that's where the project is headed_). Then you can do stuff such as:
+That's it! Check out the [export rules](docs/export_rules.md) that are used by the tool.Doing that alone and then including the generated file in your code is all you need to have full compile time access over the definitions in the header. If you do not want runtime access (or you don't find the way it is provided by this framework suitable and you'd rather build your own representation of it using the compile time model) then you don't even need to link any libraries (_This is only partly true today but that's where the project is headed_). Then you can do stuff such as:
 
 ```c++
 // in Jinx.h
