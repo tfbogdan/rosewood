@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-add_library(mcruntime STATIC dynamic_mc.cpp ${PROJECT_SOURCE_DIR}/include/mc/mc.hpp ${PROJECT_SOURCE_DIR}/include/mc/dynamic_mc.hpp ${PROJECT_SOURCE_DIR}/include/mc/type.hpp)
+add_library(mcruntime STATIC dynamic_mc.cpp ${PROJECT_SOURCE_DIR}/include/mc/mc.hpp ${PROJECT_SOURCE_DIR}/include/mc/dynamic_mc.hpp ${PROJECT_SOURCE_DIR}/include/mc/index.hpp)
 
 target_include_directories(mcruntime
         PUBLIC

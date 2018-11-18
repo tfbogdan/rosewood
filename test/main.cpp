@@ -4,7 +4,8 @@
 #include "TemplateDeclarations.metadata.h"
 
 #include <mc/dynamic_mc.hpp>
-#include <mc/type.hpp>
+#include <mc/index.hpp>
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -130,7 +131,10 @@ TEST(mc, string_wrap) {
     auto cStr = strWrapper->findOverloadSet("c_str")->getMethods()[0];
     cStr->call(&testString, &res, nullptr);
     EXPECT_EQ(testString, res);
+}
 
-    static_assert(std::is_same<mc::const_ref<int>::type, const int&>::value);
-    static_assert (std::is_same<mc::const_ref<int>::atomic_type, int>::value);
+TEST(mc, index) {
+    using Index = mc::StaticIndex<mc::DNamespaceWrapper<mc::meta_BasicDefinitions>, mc::DNamespaceWrapper<mc::meta_TemplateDeclarations>>;
+    Index index;
+
 }

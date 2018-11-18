@@ -370,7 +370,9 @@ namespace mc {
             } break;
             case clang::Decl::Kind::CXXConstructor: {
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
-                constructors.push_back(ctor);
+                if(!ctor->isDeleted()) {
+                    constructors.push_back(ctor);
+                }
             } break;
             case clang::Decl::Kind::CXXDestructor: {
                 destructor = static_cast<const clang::CXXDestructorDecl*>(decl);
