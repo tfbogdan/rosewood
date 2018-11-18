@@ -16,25 +16,6 @@
 extern llvm::cl::opt<std::string> mcOutput;
 extern llvm::cl::opt<std::string> mcJsonOutput;
 
-static const std::unordered_map<clang::BuiltinType::Kind, std::string_view> builtinTypes {
-    { clang::BuiltinType::Kind::Void, "BK_Void"},
-    { clang::BuiltinType::Kind::Char_S, "BK_Char"},
-    { clang::BuiltinType::Kind::Char_U, "BK_Char"},
-    { clang::BuiltinType::Kind::WChar_S, "BK_WChar"},
-    { clang::BuiltinType::Kind::WChar_U, "BK_UWChar"},
-    { clang::BuiltinType::Kind::Short, "BK_Short"},
-    { clang::BuiltinType::Kind::UShort, "BK_UShort"},
-    { clang::BuiltinType::Kind::Int, "BK_Int"},
-    { clang::BuiltinType::Kind::UInt, "BK_UInt"},
-    { clang::BuiltinType::Kind::Long, "BK_Long"},
-    { clang::BuiltinType::Kind::ULong, "BK_ULong"},
-    { clang::BuiltinType::Kind::LongLong, "BK_LongLong"},
-    { clang::BuiltinType::Kind::ULongLong, "BK_ULongLong"},
-    { clang::BuiltinType::Kind::Float, "BK_Float"},
-    { clang::BuiltinType::Kind::Double, "BK_Double"},
-    { clang::BuiltinType::Kind::Bool, "BK_Bool"}
-};
-
 namespace mc {
     namespace fs = std::experimental::filesystem;
 
@@ -321,7 +302,7 @@ namespace mc {
         for(const auto& field: fields) {
             auto fieldScope = outerScope.spawn(field->getNameAsString(), "mc::Field");
             printingPolicy.FullyQualifiedName = true;
-            exportType("type", field->getType(), fieldScope);
+			exportType("type", field->getType(), fieldScope);
         }
     }
 
@@ -329,6 +310,7 @@ namespace mc {
     descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
         auto ownScope = where.spawn(name, "mc::Class");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
+		ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
         std::map<std::string_view, std::set<std::string>> descriptornames = {
             {"classes", {}},
             {"overload_sets", {}},
@@ -400,13 +382,8 @@ namespace mc {
             } break;
 
             default:
-                // decls.push_back(decl);
                 break;
-            }        std::vector<std::string> exportedNamespaces;
-            std::vector<std::string> exportedEnums;
-            std::vector<std::string> exportedClasses;
-
-
+            }        
         }
 
         if (constructors.size()) {
@@ -438,16 +415,7 @@ namespace mc {
             wrap_range_in_tuple(rangeName, ownScope.inner, range);
         }
 
-        /*std::vector<std::string> genDeclRange;
-        for(const auto decl: decls) {
-            auto exportedScope = exportDeclaration(decl, ownScope);
-            if (!exportedScope.name.empty()) {
-                genDeclRange.emplace_back(fmt::format("meta_{}", exportedScope.name));
-            }
-        }*/
-
         exportedMetaTypes.emplace_back(std::tuple(clang::QualType(Record->getTypeForDecl(),0).getAsString(printingPolicy), ownScope.qualifiedName));
-        // wrap_range_in_tuple("decls", ownScope.inner, genDeclRange);
         return ownScope;
     }
 
@@ -499,17 +467,6 @@ namespace mc {
                     exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(record->getNameAsString()  , record, ownScope).name));
                 }
             } break;
-            /*case clang::Decl::Kind::ClassTemplate: {
-                auto ctemplate = static_cast<clang::ClassTemplateDecl*>(decl);
-
-            } break;
-            case clang::Decl::Kind::ClassTemplateSpecialization: {
-                auto specialization = static_cast<clang::ClassTemplateSpecializationDecl*>(decl);
-                // this is just a test. it's not expected to work due to template naming
-                if(specialization->isThisDeclarationADefinition()) {
-                    exportedClasses.push_back(fmt::format("meta_{}", exportCxxRecord(specialization, ownScope).name));
-                }
-            } break;*/
             case clang::Decl::TypeAlias: {
                 auto alias = static_cast<clang::TypeAliasDecl*>(decl);
                 auto aliasedType = alias->getUnderlyingType();
@@ -523,7 +480,6 @@ namespace mc {
                 }
             };
             default:
-                // report?
                 break;
             }
         }

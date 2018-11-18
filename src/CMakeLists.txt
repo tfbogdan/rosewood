@@ -36,8 +36,9 @@ if (NOT WIN32)
 endif(NOT WIN32)
 
 target_include_directories(mc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
-target_compile_options(mc PRIVATE -fno-rtti)
+target_compile_options(mc PRIVATE ${LLVM_DEFINITIONS} -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 target_compile_features(mc PRIVATE cxx_std_17)
+
 
 install(
 	TARGETS mc

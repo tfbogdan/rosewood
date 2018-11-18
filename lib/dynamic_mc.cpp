@@ -42,6 +42,7 @@ namespace mc {
     DField::~DField() = default;
     DClassContainer::~DClassContainer() = default;
     DEnumContainer::~DEnumContainer() = default;
+	DEnumerator::~DEnumerator() = default;
     DNamespace::~DNamespace() = default;
     DParameter::~DParameter() = default;
     DOverloadSet::~DOverloadSet() = default;

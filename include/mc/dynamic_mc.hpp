@@ -146,7 +146,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     };
 
     template <typename Descriptor>
-    class DEnumeratorWrapper {
+    class DEnumeratorWrapper : public DEnumerator {
     public:
         inline virtual std::string_view getName() const noexcept final {
             return Descriptor::name;
