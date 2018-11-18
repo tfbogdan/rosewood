@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <map>
 
 namespace td {
 
@@ -19,5 +21,10 @@ private:
 
 using SimpleTemplateInstance = SimpleTemplate<float>;   // but this should be exported as if SimpleTemplate<float> is a class called SimpleTemplateInstance
 using WrappedString = std::string;
+
+using FloatVector = std::vector<float>;
+
+using FloatStringMap = std::map<std::string, float>;
+
 
 }

@@ -90,7 +90,19 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DEnumerator : public DMetaDecl {
     public:
         virtual ~DEnumerator() = 0;
+        virtual long long getValue() const noexcept = 0;
+    };
 
+    template <typename Descriptor>
+    class DEnumeratorWrapper {
+    public:
+        inline virtual std::string_view getName() const noexcept final {
+            return Descriptor::name;
+        }
+
+        inline virtual long long getValue() const noexcept final {
+            return Descriptor::value;
+        }
     };
 
     class DEnum : public DMetaDecl {
@@ -108,6 +120,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         inline virtual std::string_view getName() const noexcept {
             return descriptor::name;
         }
+
+    private:
+        using enumerator_model = detail::range_model<typename MetaEnum::enumerators, DEnumerator, DEnumeratorWrapper>;
+        static constexpr enumerator_model enumerators {};
 
     };
 
@@ -162,11 +178,6 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return Descriptor::name;
         }
 
-    private:
-        using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
-        static constexpr parameter_model parameters {};
-
-    public:
         virtual void call(const void *object, void *retValAddr, void **args) const final {
             if constexpr (Descriptor::is_const) {
                 Descriptor::fastcall(object, retValAddr, args);
@@ -180,6 +191,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
     private:
+        using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
+        static constexpr parameter_model parameters {};
     };
 
     class DOverloadSet : public DMetaDecl {

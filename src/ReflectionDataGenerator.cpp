@@ -35,8 +35,6 @@ static const std::unordered_map<clang::BuiltinType::Kind, std::string_view> buil
     { clang::BuiltinType::Kind::Bool, "BK_Bool"}
 };
 
-#define putname ownScope.putline("static constexpr std::string_view name = \"{}\";", name)
-
 namespace mc {
     namespace fs = std::experimental::filesystem;
 
@@ -102,6 +100,21 @@ namespace mc {
         }
         where.putline(">;");
     }
+
+    clang::QualType ReflectionDataGenerator::getUnitType(clang::QualType T) {
+        auto type = T.getTypePtr();
+
+        auto isNotUnitType = [] (auto type) {
+            return type->isPointerType() || type->isReferenceType();
+        };
+
+        while (isNotUnitType(type)) {
+            type = type->getPointeeType().getTypePtr();
+        }
+
+        return clang::QualType(type, 0);
+    }
+
 
     void ReflectionDataGenerator::Generate() {
         printingPolicy = context.getPrintingPolicy();
@@ -190,7 +203,7 @@ namespace mc {
             dispatcherBody.putline("Object.~{}();", Record->getNameAsString());
         } else {
             dispatcherBody.putline("{1}{0} &Object = *reinterpret_cast<{1}{0}*>(obj);", thisTypeName, Method->isConst() ? "const ": "");
-            const auto returnType = Method->getReturnType();
+            const auto returnType = Method->getReturnType().getCanonicalType();
             const bool isReferenceType = returnType->isReferenceType() || returnType->isRValueReferenceType();
             const auto castType = returnType->isReferenceType() || returnType->isRValueReferenceType() ? returnType->getPointeeType() : returnType;
             const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}{}*>(retAddr) = {}", castType.getAsString(printingPolicy), isReferenceType ? "*": "", isReferenceType? "&": ""));
@@ -219,14 +232,16 @@ namespace mc {
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
         auto methodScope = outerScope.spawn(name, "mc::Method");
         getFastMethodDispatcher(methodScope, method, record);
-        methodScope.putline("using return_type = {};", method->getReturnType().getAsString(printingPolicy));
+        methodScope.putline("using return_type = {};", method->getReturnType().getCanonicalType().getAsString(printingPolicy));
         methodScope.putline("static constexpr bool is_const = {};", method->isConst());
 
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
-            auto parmName = (param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
+            auto parmName = (param->getDeclName().isEmpty() || param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
             auto paramScope = methodScope.spawn(parmName, "mc::Parameter");
             paramScope.putline("using type = {};", param->getType().getCanonicalType().getAsString(printingPolicy));
+            paramScope.putline("static constexpr std::string_view type_name = \"{}\";", param->getType().getCanonicalType().getAsString(printingPolicy));
+            paramScope.putline("static constexpr std::string_view unittype_name = \"{}\";", getUnitType(param->getType()).getCanonicalType().getAsString(printingPolicy));
             parameters.emplace_back(fmt::format("meta_{}", parmName));
         }
         wrap_range_in_tuple("parameters", methodScope.inner, parameters);

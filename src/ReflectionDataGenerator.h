@@ -146,6 +146,7 @@ private:
         void Generate();
 
     private:
+        clang::QualType getUnitType(clang::QualType T);
         descriptor_scope exportDeclaration(const clang::Decl *Decl, descriptor_scope &where);
 
         descriptor_scope exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where);
