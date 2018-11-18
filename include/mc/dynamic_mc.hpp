@@ -61,25 +61,41 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
          * @brief getCanonicalName provides the canonical name of this type. eg, for std::string view it is std::basic_string<char>
          * @return
          */
-        virtual std::string_view getCanonicalName() const = 0;
+        virtual std::string_view getCanonicalName() const noexcept = 0;
         /**
          * @brief getName returns the readable name of a type, exactly as it was typed by it's user.
          * @return
          */
-        virtual std::string_view getName() const = 0;
+        virtual std::string_view getName() const noexcept = 0;
         /**
          * @brief getAtomicName returns the name of the underlying type after decomosition: dropping of qualifiers and pointers and references. For const std:string&, that would be std::string
          * @return
          */
-        virtual std::string_view getAtomicName() const = 0;
+        virtual std::string_view getAtomicName() const noexcept = 0;
     };
 
     template <typename Descriptor>
-    class DTypeWrapper {
+    class DTypeWrapper : public DType {
     public:
         inline virtual ~DTypeWrapper() = default;
-    private:
 
+        inline virtual std::string_view getCanonicalName() const noexcept final {
+            return Descriptor::canonical_type_name;
+        }
+
+        inline virtual std::string_view getName() const noexcept final {
+            return Descriptor::plain_type_name;
+        }
+
+        inline virtual std::string_view getAtomicName() const noexcept final {
+            return Descriptor::atomic_type_name;
+        }
+    };
+
+    class DTypedDeclaration {
+    public:
+        virtual ~DTypedDeclaration() = 0;
+        virtual const DType *getType() const noexcept = 0;
     };
 
     class DNamespace;
@@ -98,13 +114,6 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
 
     template <typename Descriptor>
     class DClassWrapper;
-
-    template <typename Descriptor>
-    class DClassContainerWrapper {
-    protected:
-        using class_range = detail::range_model<typename Descriptor::classes, DClass, DClassWrapper>;
-        static constexpr class_range classes = {};
-    };
 
     class DEnum;
     class DEnumContainer {
@@ -167,7 +176,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     private:
     };
 
-    class DParameter : public DMetaDecl {
+    class DParameter : public DMetaDecl, public DTypedDeclaration {
     public:
         virtual ~DParameter() = 0;
     };
@@ -179,7 +188,19 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         inline virtual std::string_view getName() const noexcept final {
             return Descriptor::name;
         }
+
+        inline virtual const DType *getType() const noexcept final {
+            return &type;
+        }
+
+    private:
+        using param_type = DTypeWrapper<typename Descriptor::meta_type>;
+        static const param_type type;
     };
+
+    template<typename Descriptor>
+    const typename DParameterWrapper<Descriptor>::param_type DParameterWrapper<Descriptor>::type;
+
 
     class DMethod : public DMetaDecl {
     public:
@@ -194,6 +215,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
          */
         virtual void call(const void *object, void *retValAddr, void **args) const = 0;
         virtual void call(void *object, void *retValAddr, void **args) const = 0;
+
+        virtual const DType *getReturnType() const noexcept = 0;
     private:
 
     };
@@ -217,10 +240,20 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             Descriptor::fastcall(object, retValAddr, args);
         }
 
+        inline virtual const DType *getReturnType() const noexcept final {
+            return &returntype;
+        }
+
     private:
         using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
         static constexpr parameter_model parameters {};
+
+        using return_type = DTypeWrapper<typename Descriptor::meta_return_type>;
+        static const return_type returntype;
     };
+
+    template <typename Descriptor>
+    const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype;
 
     class DOverloadSet : public DMetaDecl {
     public:
@@ -245,7 +278,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         static constexpr overload_model overloads {};
     };
 
-    class DField : public DMetaDecl {
+    class DField : public DMetaDecl, public DTypedDeclaration {
     public:
         virtual ~DField() = 0;
     };
@@ -257,7 +290,18 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         inline virtual std::string_view getName() const noexcept final {
             return Descriptor::name;
         }
+
+        inline virtual const DType *getType() const noexcept final {
+            return &type;
+        }
+
+    private:
+        using type_information = DTypeWrapper<typename Descriptor::meta_type>;
+        static const type_information type;
     };
+
+    template <typename Descriptor>
+    const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type;
 
     class DClass : public DMetaDecl, public DClassContainer, public DEnumContainer {
     public:

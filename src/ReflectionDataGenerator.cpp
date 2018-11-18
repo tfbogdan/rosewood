@@ -321,7 +321,7 @@ namespace mc {
         for(const auto& field: fields) {
             auto fieldScope = outerScope.spawn(field->getNameAsString(), "mc::Field");
             printingPolicy.FullyQualifiedName = true;
-            fieldScope.putline("using type = {};", field->getType().getCanonicalType().getAsString(printingPolicy));
+            exportType("type", field->getType(), fieldScope);
         }
     }
 

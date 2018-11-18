@@ -3,6 +3,7 @@
 
 namespace mc {
     DType::~DType() = default;
+    DTypedDeclaration::~DTypedDeclaration() = default;
     DMetaDecl::~DMetaDecl() = default;
     DEnum::~DEnum() = default;
     DField::~DField() = default;
