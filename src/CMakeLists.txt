@@ -35,8 +35,12 @@ if (NOT WIN32)
 	target_link_libraries(mc PRIVATE stdc++fs)
 endif(NOT WIN32)
 
+list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
+include (AddLLVM)
+llvm_update_compile_flags(mc)
+
 target_include_directories(mc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
-target_compile_options(mc PRIVATE ${LLVM_DEFINITIONS} -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+target_compile_options(mc PRIVATE -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 target_compile_features(mc PRIVATE cxx_std_17)
 
 
