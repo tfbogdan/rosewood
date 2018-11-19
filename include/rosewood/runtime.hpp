@@ -1,13 +1,13 @@
 #pragma once
 
-#include <mc/mc.hpp>
+#include <rosewood/rosewood.hpp>
 #include <array>
 #include <functional>
 #include <vector>
 #include <unordered_map>
 #include <stdexcept>
 
-namespace mc {
+namespace rosewood {
 
     class const_corectness_error : public std::logic_error {
         using std::logic_error::logic_error;

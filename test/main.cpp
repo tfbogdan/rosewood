@@ -3,8 +3,8 @@
 #include "TemplateDeclarations.h"
 #include "TemplateDeclarations.metadata.h"
 
-#include <mc/dynamic_mc.hpp>
-#include <mc/index.hpp>
+#include <rosewood/runtime.hpp>
+#include <rosewood/index.hpp>
 
 #include <functional>
 #include <memory>
@@ -19,7 +19,7 @@ struct noArgsNoReturnPredicate{
 };
 
 TEST(mc, static_enumeration) {
-    using Enum = mc::meta<basic::Enum>;
+    using Enum = rosewood::meta<basic::Enum>;
     constexpr Enum enumInst;
 
     const std::vector<std::pair<std::string, int>> expectedEnums {
@@ -46,7 +46,7 @@ TEST(mc, static_enumeration) {
 
 
 TEST(mc, static_class) {
-    using PlainClass = mc::meta<basic::PlainClass>;
+    using PlainClass = rosewood::meta<basic::PlainClass>;
     constexpr PlainClass plainClass;
 
     static_assert (!plainClass.has_overload_set("aMethod"));
@@ -72,14 +72,14 @@ TEST(mc, static_class) {
 }
 
 TEST(mc, runtime_module) {
-    using BasicDefinitions = mc::DNamespaceWrapper<mc::meta_BasicDefinitions>;
+    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
     BasicDefinitions basicDefs;
 
     EXPECT_EQ(basicDefs.getNamespaces()[0]->getName(), "basic");
     EXPECT_EQ(basicDefs.getClasses().size(), 0);
     EXPECT_EQ(basicDefs.getEnums().size(), 0);
 
-    const mc::DNamespace *dBasic = basicDefs.getNamespaces()[0];
+    const rosewood::DNamespace *dBasic = basicDefs.getNamespaces()[0];
 
     EXPECT_EQ(dBasic->getNamespaces().size(), 0);
     EXPECT_EQ(dBasic->getEnums().size(), 2);
@@ -87,10 +87,10 @@ TEST(mc, runtime_module) {
 }
 
 TEST(mc, runtime_namespace) {
-    using BasicDefinitions = mc::DNamespaceWrapper<mc::meta_BasicDefinitions>;
+    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
     BasicDefinitions basicDefs;
 
-    const mc::DNamespace *dBasic = basicDefs.getNamespaces()[0];
+    const rosewood::DNamespace *dBasic = basicDefs.getNamespaces()[0];
 
     EXPECT_THROW(dBasic->findChildNamespace("unthinkable"), std::out_of_range);
     EXPECT_NO_THROW(basicDefs.findChildNamespace("basic"));
@@ -98,13 +98,13 @@ TEST(mc, runtime_namespace) {
 }
 
 TEST(mc, runtime_class) {
-    std::unique_ptr<mc::DClass> dynamicJinx(new mc::DClassWrapper<mc::meta<basic::PlainClass>>);
+    std::unique_ptr<rosewood::DClass> dynamicJinx(new rosewood::DClassWrapper<rosewood::meta<basic::PlainClass>>);
     EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
     EXPECT_TRUE(dynamicJinx->hasMethod("overloadedMethod"));
 }
 
 TEST(mc, runtime_searches) {
-    using BasicDefinitions = mc::DNamespaceWrapper<mc::meta_BasicDefinitions>;
+    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
     BasicDefinitions basicDefs;
 
     EXPECT_NO_THROW(basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findOverloadSet("doubleInteger"));
@@ -118,11 +118,11 @@ TEST(mc, runtime_searches) {
 
     aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
     EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
-    EXPECT_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs), mc::const_corectness_error);
+    EXPECT_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs), rosewood::const_corectness_error);
 }
 
 TEST(mc, string_wrap) {
-    using TemplateDeclarations = mc::DNamespaceWrapper<mc::meta_TemplateDeclarations>;
+    using TemplateDeclarations = rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>;
     TemplateDeclarations module;
     auto tdNamespace = module.findChildNamespace("td");
     auto strWrapper = tdNamespace->findChildClass("WrappedString");
@@ -134,7 +134,7 @@ TEST(mc, string_wrap) {
 }
 
 TEST(mc, index) {
-    using Index = mc::StaticIndex<mc::DNamespaceWrapper<mc::meta_BasicDefinitions>, mc::DNamespaceWrapper<mc::meta_TemplateDeclarations>>;
+    using Index = rosewood::StaticIndex<rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>, rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>>;
     Index index;
 
 }

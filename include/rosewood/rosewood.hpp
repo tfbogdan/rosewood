@@ -7,7 +7,7 @@
 #include <tuple>
 #include <type_traits>
 
-namespace mc {
+namespace rosewood {
     struct nil_t {};
 
     template <typename t1, typename t2>

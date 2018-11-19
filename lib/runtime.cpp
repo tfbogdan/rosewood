@@ -1,7 +1,7 @@
-#include <mc/dynamic_mc.hpp>
+#include <rosewood/runtime.hpp>
 
 
-namespace mc {
+namespace rosewood {
     DType::~DType() = default;
     DTypedDeclaration::~DTypedDeclaration() = default;
     DMetaDecl::~DMetaDecl() = default;

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-project(mc VERSION 0.0.1 LANGUAGES CXX)
+project(rosewood VERSION 0.0.2 LANGUAGES CXX)
 find_package(Clang REQUIRED CONFIG)
 enable_testing()
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
@@ -17,22 +17,18 @@ conan_cmake_run(CONANFILE conanfile.txt
 
 add_definitions(-DFMT_HEADER_ONLY) # global right now. should be added per target
                                    # use header only fmt as it's library is not compatible with older platforms
-include(cmake/mc.cmake)
+include(cmake/rosewood.cmake)
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(test)
 
 
 
-configure_file(cmake/mc.cmake lib/cmake/mc/mc.cmake COPYONLY)
-install(FILES cmake/mc.cmake DESTINATION lib/cmake/mc)
+configure_file(cmake/rosewood.cmake lib/cmake/rosewood/rosewood.cmake COPYONLY)
+install(FILES cmake/rosewood.cmake DESTINATION lib/cmake/rosewood)
 
-configure_file(cmake/mc-config.cmake.in lib/cmake/mc/mc-config.cmake @ONLY)
-configure_file(cmake/CMakeDetermineMcCompiler.cmake.in lib/cmake/mc/CMakeDetermineMcCompiler.cmake @ONLY)
-configure_file(cmake/CMakeMcCompiler.cmake.in lib/cmake/mc/CMakeMcCompiler.cmake.in COPYONLY)
-configure_file(cmake/CMakeMcInformation.cmake.in lib/cmake/mc/CMakeMcInformation.cmake @ONLY)
-configure_file(cmake/CMakeTestMcCompiler.cmake.in lib/cmake/mc/CMakeTestMcCompiler.cmake @ONLY)
+configure_file(cmake/rosewood-config.cmake.in lib/cmake/rosewood/rosewood-config.cmake @ONLY)
 
-export(TARGETS mc mcruntime FILE lib/cmake/mc/mc-exports.cmake)
-install(EXPORT mc-exports DESTINATION lib/cmake/mc)
-install(FILES ${PROJECT_BINARY_DIR}/lib/cmake/mc/mc-config.cmake DESTINATION lib/cmake/mc)
+export(TARGETS rwc rwruntime FILE lib/cmake/rosewood/mc-exports.cmake)
+install(EXPORT rosewood-exports DESTINATION lib/cmake/rosewood)
+install(FILES ${PROJECT_BINARY_DIR}/lib/cmake/rosewood/rosewood-config.cmake DESTINATION lib/cmake/rosewood)

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "mc.hpp"
-#include "dynamic_mc.hpp"
+#include "rosewood.hpp"
+#include "runtime.hpp"
 
 #include <unordered_map>
 #include <string_view>
 #include <tuple>
 
-namespace mc {
+namespace rosewood {
 
 /**
  *  @class StaticIndex is a utlity that makes searching for declarations easier.
@@ -25,7 +25,7 @@ private:
     static const std::tuple<WrappedTypes...> toplevel_types;
 
     static auto init_name_lookup() {
-        std::unordered_map<std::string_view, const mc::DMetaDecl*> result;
+        std::unordered_map<std::string_view, const rosewood::DMetaDecl*> result;
         std::apply([&result] (const auto &...decls) {
             // once the top level declarations are added to the index, then
             ((result[decls.getQualifiedName()] = &decls), ...);
@@ -34,13 +34,13 @@ private:
     }
 
     // when an entity is searched for by it's full name than nothing beats a hash table
-    static const std::unordered_map<std::string_view, const mc::DMetaDecl*> name_lookup;
+    static const std::unordered_map<std::string_view, const rosewood::DMetaDecl*> name_lookup;
 };
 
 template <typename ...WrappedTypes>
 const std::tuple<WrappedTypes...> StaticIndex<WrappedTypes...>::toplevel_types;
 
 template <typename ...WrappedTypes>
-const std::unordered_map<std::string_view, const mc::DMetaDecl*> StaticIndex<WrappedTypes...>::name_lookup = StaticIndex<WrappedTypes...>::init_name_lookup();
+const std::unordered_map<std::string_view, const rosewood::DMetaDecl*> StaticIndex<WrappedTypes...>::name_lookup = StaticIndex<WrappedTypes...>::init_name_lookup();
 
 }

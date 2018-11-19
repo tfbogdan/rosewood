@@ -2,7 +2,7 @@
 set(CLANG_LIBRARIES clangFrontend clangDriver clangParse clangSema)
 set(CLANG_LIBRARIES ${CLANG_LIBRARIES} clangAST clangLex clangBasic clangTooling )
 
-add_executable(mc
+add_executable(rwc
 	main.cpp
 	ClangInfrastructure.h
 	ClangInfrastructure.cpp
@@ -14,7 +14,7 @@ add_executable(mc
 	IdentifierRepository.cpp
 )
 
-target_link_libraries(mc
+target_link_libraries(rwc
 	PRIVATE
         # TDO: The following block should vary from platform to platform but this covers both linux and windows platforms so it's good enough right now
         LLVMX86Disassembler
@@ -30,23 +30,23 @@ target_link_libraries(mc
 	LLVMSupport
 )
 
-target_link_libraries(mc PRIVATE ${CLANG_LIBRARIES} CONAN_PKG::fmt CONAN_PKG::jsonformoderncpp)
+target_link_libraries(rwc PRIVATE ${CLANG_LIBRARIES} CONAN_PKG::fmt CONAN_PKG::jsonformoderncpp)
 if (NOT WIN32)
-	target_link_libraries(mc PRIVATE stdc++fs)
+	target_link_libraries(rwc PRIVATE stdc++fs)
 endif(NOT WIN32)
 
 list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
 include (AddLLVM)
-llvm_update_compile_flags(mc)
+llvm_update_compile_flags(rwc)
 
-target_include_directories(mc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
-target_compile_options(mc PRIVATE -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
-target_compile_features(mc PRIVATE cxx_std_17)
+target_include_directories(rwc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
+target_compile_options(rwc PRIVATE -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+target_compile_features(rwc PRIVATE cxx_std_17)
 
 
 install(
-	TARGETS mc
-	EXPORT mc-exports
+	TARGETS rwc
+	EXPORT rosewood-exports
   RUNTIME
 		DESTINATION bin
 )

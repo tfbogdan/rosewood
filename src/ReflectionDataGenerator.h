@@ -75,7 +75,7 @@ struct descriptor_scope {
          inner(outer.spawn()),
          name(Name),
          kind(Kind),
-         qualifiedName(fmt::format("{}::meta_{}", parentQualName.empty() ? "mc" : parentQualName, Name)) {}
+         qualifiedName(fmt::format("{}::meta_{}", parentQualName.empty() ? "rosewood" : parentQualName, Name)) {}
 
     descriptor_scope(const descriptor_scope &other) = delete;
     descriptor_scope(descriptor_scope &&other)

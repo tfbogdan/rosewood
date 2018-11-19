@@ -29,14 +29,14 @@ namespace mc {
         printingPolicy(astContext.getPrintingPolicy()) {
 
         global_scope.putline("#pragma once");
-        global_scope.putline("#include <mc/mc.hpp>");
+        global_scope.putline("#include <rosewood/rosewood.hpp>");
         auto mainFile = astContext.getSourceManager().getMainFileID();
         auto mainFileLoc = astContext.getSourceManager().getComposedLoc(mainFile, 0);
         auto mainFilePath = astContext.getSourceManager().getFilename(mainFileLoc);
 
         global_scope.putline("#include \"{}\"", mainFilePath.str());
         global_scope.putline("");
-        global_scope.putline("namespace mc {{");
+        global_scope.putline("namespace rosewood {{");
     }
 
     ReflectionDataGenerator::~ReflectionDataGenerator() {
@@ -99,7 +99,7 @@ namespace mc {
 
     void ReflectionDataGenerator::Generate() {
         printingPolicy = context.getPrintingPolicy();
-        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), "mc::Module");
+        descriptor_scope module_scope = descriptor_scope(global_scope.spawn(), mcModuleName.getValue(), "rosewood::Module");
 
         std::vector<std::string> exportedNamespaces;
         std::vector<std::string> exportedEnums;
@@ -209,7 +209,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportType(const std::string &exportAs, clang::QualType type, descriptor_scope &where) {
-        auto ownScope = where.spawn(exportAs, "mc::Type");
+        auto ownScope = where.spawn(exportAs, "rosewood::Type");
         const auto canonicalTypeName = type.getCanonicalType().getAsString(printingPolicy);
         ownScope.putline("using canonical_type = {};", canonicalTypeName);
         ownScope.putline("static constexpr std::string_view canonical_type_name = \"{}\";", canonicalTypeName);
@@ -224,7 +224,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
-        auto methodScope = outerScope.spawn(name, "mc::Method");
+        auto methodScope = outerScope.spawn(name, "rosewood::Method");
         getFastMethodDispatcher(methodScope, method, record);
 
         exportType("return_type", method->getReturnType(), methodScope);
@@ -233,7 +233,7 @@ namespace mc {
         std::vector<std::string> parameters;
         for (const auto param: method->parameters()) {
             auto parmName = (param->getDeclName().isEmpty() || param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
-            auto paramScope = methodScope.spawn(parmName, "mc::Parameter");
+            auto paramScope = methodScope.spawn(parmName, "rosewood::Parameter");
             exportType("type", param->getType(), paramScope);
             parameters.emplace_back(fmt::format("meta_{}", parmName));
         }
@@ -242,7 +242,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        auto overloadScope = outerScope.spawn(name, "mc::OverloadSet");
+        auto overloadScope = outerScope.spawn(name, "rosewood::OverloadSet");
 
         std::vector<std::string> overloadNames;
 
@@ -256,7 +256,7 @@ namespace mc {
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        auto opScope = outerScope.spawn(name, "mc::Operator");
+        auto opScope = outerScope.spawn(name, "rosewood::Operator");
         std::vector<std::string> overloadNames;
 
         for(const auto Method: overloads) {
@@ -281,7 +281,7 @@ namespace mc {
 
     descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
         static const std::string name = "constructor";
-        auto overloadScope = outerScope.spawn(name, "mc::ConstructorSet");
+        auto overloadScope = outerScope.spawn(name, "rosewood::ConstructorSet");
 
         std::vector<std::string> overloadNames;
 
@@ -300,7 +300,7 @@ namespace mc {
 
     void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
         for(const auto& field: fields) {
-            auto fieldScope = outerScope.spawn(field->getNameAsString(), "mc::Field");
+            auto fieldScope = outerScope.spawn(field->getNameAsString(), "rosewood::Field");
             printingPolicy.FullyQualifiedName = true;
 			exportType("type", field->getType(), fieldScope);
         }
@@ -308,7 +308,7 @@ namespace mc {
 
 
     descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
-        auto ownScope = where.spawn(name, "mc::Class");
+        auto ownScope = where.spawn(name, "rosewood::Class");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
 		ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
         std::map<std::string_view, std::set<std::string>> descriptornames = {
@@ -427,12 +427,12 @@ namespace mc {
             qualName = Enum->getTypedefNameForAnonDecl()->getQualifiedNameAsString();
         }
 
-        auto ownScope = where.spawn(name, "mc::Enum");
+        auto ownScope = where.spawn(name, "rosewood::Enum");
         ownScope.putline("using type = {};", qualName);
         std::vector<clang::EnumConstantDecl*> enumerators;
         for(const auto enumerator: Enum->enumerators()) {
             auto enName = enumerator->getNameAsString();
-            auto enScope = ownScope.spawn(enName, "mc::Enumerator");
+            auto enScope = ownScope.spawn(enName, "rosewood::Enumerator");
             enScope.putline("static constexpr {} value = {};", Enum->getIntegerType().getTypePtrOrNull() ? Enum->getIntegerType().getAsString(printingPolicy) : "int",enumerator->getInitVal().toString(10));
             enumerators.push_back(enumerator);
         }
@@ -445,7 +445,7 @@ namespace mc {
     descriptor_scope ReflectionDataGenerator::exportNamespace(const clang::NamespaceDecl *Namespace, descriptor_scope &where) {
         auto qualName = Namespace->getQualifiedNameAsString();
         auto name = Namespace->getNameAsString();
-        auto ownScope = where.spawn(name, "mc::Namespace");
+        auto ownScope = where.spawn(name, "rosewood::Namespace");
 
         ownScope.print_header();
 
