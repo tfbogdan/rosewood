@@ -26,7 +26,6 @@ void printInvokation(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
-    llvm::InitializeNativeTarget();
     printInvokation(argc, argv);
 
     clang::tooling::CommonOptionsParser OptionsParser(argc, argv, mcOptionsCategory);
