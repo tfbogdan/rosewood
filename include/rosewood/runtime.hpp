@@ -74,22 +74,28 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         virtual std::string_view getAtomicName() const noexcept = 0;
     };
 
-    template <typename Descriptor>
+    template <typename UnderlyingType>
     class DTypeWrapper : public DType {
     public:
         inline virtual ~DTypeWrapper() = default;
 
+        inline DTypeWrapper(UnderlyingType type)
+            :typeInstance(type) {}
+
         inline virtual std::string_view getCanonicalName() const noexcept final {
-            return Descriptor::canonical_type_name;
+            return typeInstance.canonical_name;
         }
 
         inline virtual std::string_view getName() const noexcept final {
-            return Descriptor::plain_type_name;
+            return typeInstance.name;
         }
 
         inline virtual std::string_view getAtomicName() const noexcept final {
-            return Descriptor::atomic_type_name;
+            return typeInstance.atomic_name;
         }
+
+    private:
+        const UnderlyingType typeInstance;
     };
 
     class DTypedDeclaration {
@@ -148,19 +154,27 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     template <typename Descriptor>
     class DEnumeratorWrapper : public DEnumerator {
     public:
+        inline DEnumeratorWrapper(const Descriptor &D)
+            :descriptor(D) {}
+
+        DEnumeratorWrapper() = default;
+
         inline virtual std::string_view getName() const noexcept final {
-            return Descriptor::name;
+            return descriptor.name;
         }
 
         inline virtual long long getValue() const noexcept final {
-            return Descriptor::value;
+            return descriptor.value;
         }
+    private:
+        Descriptor descriptor;
     };
 
     class DEnum : public DMetaDecl {
     public:
         virtual ~DEnum() = 0;
         virtual const DEnum *asEnum() const noexcept final;
+        virtual std::vector<const DEnumerator*> getEnumerators() const noexcept = 0;
     private:
     };
 
@@ -174,11 +188,27 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return descriptor::name;
         }
 
-    private:
-        using enumerator_model = detail::range_model<typename MetaEnum::enumerators, DEnumerator, DEnumeratorWrapper>;
-        static constexpr enumerator_model enumerators {};
+        inline virtual std::vector<const DEnumerator*> getEnumerators() const noexcept final {
+            return std::apply([](const auto &...enums){
+                std::vector<const DEnumerator*> ens(enumerators.size());
+                unsigned index(0);
+                ((ens[index++] = &enums), ...);
+                return ens;
+            }, enumerators);
+        }
 
+    private:
+
+        static const std::array<DEnumeratorWrapper<typename descriptor::enumerator_type>, descriptor::enumerators.size()> enumerators;
     };
+
+    template<typename MetaEnum>
+    const std::array<DEnumeratorWrapper<typename MetaEnum::enumerator_type>, MetaEnum::enumerators.size()> DEnumWrapper<MetaEnum>::enumerators(std::apply([](const auto& ...enums) {
+        std::array<DEnumeratorWrapper<typename descriptor::enumerator_type>, descriptor::enumerators.size()> res;
+        unsigned idx(0);
+        ((res[idx++] = DEnumeratorWrapper<typename descriptor::enumerator_type>(enums)), ...);
+        return res;
+    }, MetaEnum::enumerators));
 
     class DClass;
 
@@ -211,12 +241,12 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
     private:
-        using param_type = DTypeWrapper<typename Descriptor::meta_type>;
+        using param_type = DTypeWrapper<decltype(Descriptor::type)>;
         static const param_type type;
     };
 
     template<typename Descriptor>
-    const typename DParameterWrapper<Descriptor>::param_type DParameterWrapper<Descriptor>::type;
+    const typename DParameterWrapper<Descriptor>::param_type DParameterWrapper<Descriptor>::type(Descriptor::type);
 
 
     class DMethod : public DMetaDecl {
@@ -265,12 +295,12 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
         static constexpr parameter_model parameters {};
 
-        using return_type = DTypeWrapper<typename Descriptor::meta_return_type>;
+        using return_type = DTypeWrapper<decltype(Descriptor::return_type)>;
         static const return_type returntype;
     };
 
     template <typename Descriptor>
-    const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype;
+    const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype(Descriptor::return_type);
 
     class DOverloadSet : public DMetaDecl {
     public:
@@ -313,12 +343,12 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
     private:
-        using type_information = DTypeWrapper<typename Descriptor::meta_type>;
+        using type_information = DTypeWrapper<decltype(Descriptor::type)>;
         static const type_information type;
     };
 
     template <typename Descriptor>
-    const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type;
+    const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type(Descriptor::type);
 
     class DClass : public DMetaDecl, public DClassContainer, public DEnumContainer {
     public:

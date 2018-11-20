@@ -77,9 +77,6 @@ namespace rosewood {
     template<typename T>
     struct meta;
 
-    template<typename T>
-    struct Type {};
-    
     template<typename Descriptor>
     struct Module {};
 
@@ -91,33 +88,32 @@ namespace rosewood {
         using descriptor = Descriptor;
 
         constexpr bool in_range(int value) const {
-            using enumerators_tuple = typename descriptor::enumerators;
             return std::apply([value] (auto ...enums) {
                 return (... || (enums.value == value));
-            }, enumerators_tuple());
+            }, descriptor::enumerators);
         }
 
         template <typename visitorT>
         constexpr void for_each_enumerator(visitorT visitor) const {
-            using enumerators_tuple = typename descriptor::enumerators;
             std::apply([visitor] (auto ...enums) {
                 (visitor(enums), ...);
-            }, enumerators_tuple());
+            }, descriptor::enumerators);
         }
     };
 
 
 
-    template<typename Descriptor>
+    template<typename EnumType>
     struct Enumerator {
-        using descriptor = Descriptor;
         constexpr std::string_view get_name() const noexcept {
-            return descriptor::name;
+            return name;
         }
 
         constexpr auto get_value() const noexcept {
-            return descriptor::value;
+            return value;
         }
+        EnumType value;
+        std::string_view name;
     };
 
     template<typename Descriptor>

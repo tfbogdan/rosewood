@@ -134,7 +134,6 @@ TEST(mc, string_wrap) {
 }
 
 TEST(mc, index) {
-    using Index = rosewood::StaticIndex<rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>, rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>>;
-    Index index;
-
+    // using Index = rosewood::StaticIndex<rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>, rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>>;
+    // Index index;
 }

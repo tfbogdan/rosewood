@@ -29,7 +29,11 @@ namespace mc {
         printingPolicy(astContext.getPrintingPolicy()) {
 
         global_scope.putline("#pragma once");
+        global_scope.putline("#include <array>");
+        global_scope.putline("#include <string_view>");
+
         global_scope.putline("#include <rosewood/rosewood.hpp>");
+        global_scope.putline("#include <rosewood/type.hpp>");
         auto mainFile = astContext.getSourceManager().getMainFileID();
         auto mainFileLoc = astContext.getSourceManager().getComposedLoc(mainFile, 0);
         auto mainFilePath = astContext.getSourceManager().getFilename(mainFileLoc);
@@ -208,19 +212,11 @@ namespace mc {
         descScope.putline("}}");
     }
 
-    descriptor_scope ReflectionDataGenerator::exportType(const std::string &exportAs, clang::QualType type, descriptor_scope &where) {
-        auto ownScope = where.spawn(exportAs, "rosewood::Type");
+    void ReflectionDataGenerator::exportType(const std::string &exportAs, clang::QualType type, descriptor_scope &where) {
         const auto canonicalTypeName = type.getCanonicalType().getAsString(printingPolicy);
-        ownScope.putline("using canonical_type = {};", canonicalTypeName);
-        ownScope.putline("static constexpr std::string_view canonical_type_name = \"{}\";", canonicalTypeName);
-
         const auto plainTypeName = type.getAsString(printingPolicy);
-        ownScope.putline("static constexpr std::string_view plain_type_name = \"{}\";", plainTypeName);
-
         const auto atomicTypeName = getUnitType(type).getCanonicalType().getAsString(printingPolicy);
-        ownScope.putline("using atomic_type = {};", atomicTypeName);
-        ownScope.putline("static constexpr std::string_view atomic_type_name = \"{}\";", atomicTypeName);
-        return ownScope;
+        where.putline("static constexpr rosewood::Type<{0}> {3}{{\"{1}\", \"{0}\", \"{2}\"}};", canonicalTypeName, plainTypeName, atomicTypeName, exportAs);
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
@@ -429,16 +425,19 @@ namespace mc {
 
         auto ownScope = where.spawn(name, "rosewood::Enum");
         ownScope.putline("using type = {};", qualName);
-        std::vector<clang::EnumConstantDecl*> enumerators;
-        for(const auto enumerator: Enum->enumerators()) {
+        ownScope.putline("using enumerator_type = Enumerator<{}>;", Enum->getIntegerType().getAsString(printingPolicy));
+        std::vector<clang::EnumConstantDecl*> enumerators(Enum->enumerators().begin(), Enum->enumerators().end());
+        ownScope.putline("static constexpr std::array<Enumerator<{}>, {}> enumerators {{", Enum->getIntegerType().getAsString(printingPolicy), enumerators.size());
+
+        for(unsigned index(0); index < enumerators.size(); ++index) {
+            auto enumerator = enumerators[index];
             auto enName = enumerator->getNameAsString();
-            auto enScope = ownScope.spawn(enName, "rosewood::Enumerator");
-            enScope.putline("static constexpr {} value = {};", Enum->getIntegerType().getTypePtrOrNull() ? Enum->getIntegerType().getAsString(printingPolicy) : "int",enumerator->getInitVal().toString(10));
-            enumerators.push_back(enumerator);
+            auto enScope = ownScope.inner.spawn();
+            enScope.putline("Enumerator<{}> {{ {}, \"{}\" }}{}", Enum->getIntegerType().getAsString(printingPolicy), enumerator->getInitVal().toString(10), enName, index < (enumerators.size() - 1) ? ",": std::string());
         }
 
+        ownScope.putline("}};");
         exportedMetaTypes.emplace_back(std::tuple(qualName, ownScope.qualifiedName));
-        wrap_range_in_tuple("enumerators", ownScope.inner, enumerators);
         return ownScope;
     }
 

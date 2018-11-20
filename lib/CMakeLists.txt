@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-add_library(rwruntime STATIC runtime.cpp ${PROJECT_SOURCE_DIR}/include/rosewood/rosewood.hpp ${PROJECT_SOURCE_DIR}/include/rosewood/runtime.hpp ${PROJECT_SOURCE_DIR}/include/rosewood/index.hpp)
+add_library(rwruntime STATIC runtime.cpp ${PROJECT_SOURCE_DIR}/include/rosewood/rosewood.hpp ${PROJECT_SOURCE_DIR}/include/rosewood/runtime.hpp ${PROJECT_SOURCE_DIR}/include/rosewood/index.hpp ${PROJECT_SOURCE_DIR}/include/rosewood/type.hpp)
 
 target_include_directories(rwruntime
         PUBLIC
