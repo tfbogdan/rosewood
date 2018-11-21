@@ -1,4 +1,4 @@
-# mc [![Build Status](https://travis-ci.org/tfbogdan/rosewood.svg?branch=master)](https://travis-ci.org/tfbogdan/rosewood)[![codecov](https://codecov.io/gh/tfbogdan/mc/branch/master/graph/badge.svg)](https://codecov.io/gh/tfbogdan/mc)
+# mc [![Build Status](https://travis-ci.org/tfbogdan/rosewood.svg?branch=master)](https://travis-ci.org/tfbogdan/rosewood)[![codecov](https://codecov.io/gh/tfbogdan/rosewood/branch/master/graph/badge.svg)](https://codecov.io/gh/tfbogdan/rosewood)
 A no nonsense approach to C++ reflection. Aims to provide the means of accessing type information at compile and run time. Achieves that by means of a Clang tool that generates a compile time model of the code it parses. Tries to stay out of its users way by not inventing new syntax or high level concepts such as signals and slots but enables the (more accessible) possibility of higher level constructs in user code.
 
 ## Note
