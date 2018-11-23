@@ -154,10 +154,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     template <typename Descriptor>
     class DEnumeratorWrapper : public DEnumerator {
     public:
-        inline DEnumeratorWrapper(const Descriptor &D)
-            :descriptor(D) {}
-
-        DEnumeratorWrapper() = default;
+		DEnumeratorWrapper(const Descriptor &d) : descriptor(d) {}
 
         inline virtual std::string_view getName() const noexcept final {
             return descriptor.name;
@@ -166,8 +163,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         inline virtual long long getValue() const noexcept final {
             return descriptor.value;
         }
-    private:
-        Descriptor descriptor;
+
+		const Descriptor descriptor;
     };
 
     class DEnum : public DMetaDecl {
@@ -189,26 +186,30 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline virtual std::vector<const DEnumerator*> getEnumerators() const noexcept final {
-            return std::apply([](const auto &...enums){
-                std::vector<const DEnumerator*> ens(enumerators.size());
-                unsigned index(0);
-                ((ens[index++] = &enums), ...);
-                return ens;
-            }, enumerators);
+			std::vector<const DEnumerator*> result; result.reserve(enumerators.size());
+			for (const auto &en : enumerators) {
+				result.emplace_back(&en);
+			}
+            return result;
         }
 
     private:
-
-        static const std::array<DEnumeratorWrapper<typename descriptor::enumerator_type>, descriptor::enumerators.size()> enumerators;
+        static const std::vector<DEnumeratorWrapper<typename descriptor::enumerator_type>> enumerators;
     };
 
+	template<typename MetaEnum>
+	std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> initEnumeratorsVector() {
+		std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> result;
+		result.reserve(MetaEnum::enumerators.size());
+		for (const auto &en: MetaEnum::enumerators) {
+			result.emplace_back(en);
+		}
+		return result;
+	}
+
     template<typename MetaEnum>
-    const std::array<DEnumeratorWrapper<typename MetaEnum::enumerator_type>, MetaEnum::enumerators.size()> DEnumWrapper<MetaEnum>::enumerators(std::apply([](const auto& ...enums) {
-        std::array<DEnumeratorWrapper<typename descriptor::enumerator_type>, descriptor::enumerators.size()> res;
-        unsigned idx(0);
-        ((res[idx++] = DEnumeratorWrapper<typename descriptor::enumerator_type>(enums)), ...);
-        return res;
-    }, MetaEnum::enumerators));
+	const std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> DEnumWrapper<MetaEnum>::enumerators =
+		initEnumeratorsVector<MetaEnum>();
 
     class DClass;
 
