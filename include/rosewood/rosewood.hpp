@@ -150,6 +150,26 @@ namespace rosewood {
         }
     };
 
+	template <typename ArgType> 
+	struct FunctionParameter {
+		using type_t = ArgType;
+
+		std::string_view name;
+	};
+
+	template<typename ClassType, typename ReturnType, bool isConst, bool isNoExcept, typename ...ArgTypes>
+	struct MethodDeclaration {
+		using class_type = ClassType;
+		using return_type = ReturnType;
+		static constexpr bool is_const = isConst;
+		static constexpr bool is_noexcept = isNoExcept;
+
+		using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+
+		std::string_view	name;
+		arg_types			args;
+	};
+
     template<typename Descriptor>
     struct OverloadSet {
         using descriptor = Descriptor;
