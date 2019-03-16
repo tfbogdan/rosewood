@@ -136,4 +136,26 @@ TEST(mc, string_wrap) {
 TEST(mc, index) {
     // using Index = rosewood::StaticIndex<rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>, rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>>;
     // Index index;
+
+    static constexpr auto method =
+            rosewood::MethodDeclaration(
+                &basic::PlainClass::constNoExceptFunction,
+                "constNoExceptFunction",
+                std::tuple<>());
+    static constexpr auto otherMethod =
+           rosewood::MethodDeclaration(
+              &basic::PlainClass::doubleInteger,
+              "doubleInteger",
+              std::tuple(rosewood::FunctionParameter<int>("namedParam", false)));
+    EXPECT_TRUE(method.isConst());
+    EXPECT_FALSE(otherMethod.isConst());
+    basic::PlainClass plainClass;
+    method.invoke(&plainClass, nullptr, nullptr);
+
+    int returnSlot;
+    int argValue = 6;
+    void* argsArray[] = {&argValue};
+
+    otherMethod.invoke(&plainClass, &returnSlot, argsArray);
+    EXPECT_EQ(returnSlot, plainClass.doubleInteger(argValue));
 }

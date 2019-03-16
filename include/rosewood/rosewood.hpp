@@ -150,25 +150,178 @@ namespace rosewood {
         }
     };
 
-	template <typename ArgType> 
-	struct FunctionParameter {
-		using type_t = ArgType;
+    template <typename ArgType>
+    struct FunctionParameter {
+        using type_t = ArgType;
 
-		std::string_view name;
-	};
+        constexpr FunctionParameter(std::string_view argName, bool hasDefaultValue) noexcept
+            :name(argName),
+              isDefaulted(hasDefaultValue) {}
 
-	template<typename ClassType, typename ReturnType, bool isConst, bool isNoExcept, typename ...ArgTypes>
-	struct MethodDeclaration {
-		using class_type = ClassType;
-		using return_type = ReturnType;
-		static constexpr bool is_const = isConst;
-		static constexpr bool is_noexcept = isNoExcept;
+        constexpr FunctionParameter() noexcept = default;
+        constexpr FunctionParameter(const FunctionParameter&) noexcept = default;
+        constexpr FunctionParameter(FunctionParameter&&) noexcept = default;
 
-		using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+        std::string_view name;
+        bool isDefaulted;
 
-		std::string_view	name;
-		arg_types			args;
-	};
+        // Is a reference the correct type to work with here?
+        // certainly needs a bit of looking into
+        void *eraseType(type_t &t) const noexcept {
+            return static_cast<void*>(&t);
+        }
+
+        auto narrowType(void *ptr) const noexcept {
+            return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
+        }
+    };
+
+    template <typename ClassType, typename ReturnType, bool Const, bool NoExcept, typename ...Args>
+    struct MethodTypeCompositor;
+
+    template <typename ClassType, typename ReturnType, typename ...Args>
+    struct MethodTypeCompositor<ClassType, ReturnType, true, true, Args...> {
+        using method_type = ReturnType (ClassType::*)(Args...) const noexcept;
+        using object_type = const ClassType;
+    };
+
+    template <typename ClassType, typename ReturnType, typename ...Args>
+    struct MethodTypeCompositor<ClassType, ReturnType, true, false, Args...> {
+        using method_type = ReturnType (ClassType::*)(Args...) const;
+        using object_type = const ClassType;
+    };
+
+    template <typename ClassType, typename ReturnType, typename ...Args>
+    struct MethodTypeCompositor<ClassType, ReturnType, false, true, Args...> {
+        using method_type = ReturnType (ClassType::*)(Args...) noexcept;
+        using object_type = ClassType;
+    };
+
+    template <typename ClassType, typename ReturnType, typename ...Args>
+    struct MethodTypeCompositor<ClassType, ReturnType, false, false, Args...> {
+        using method_type = ReturnType (ClassType::*)(Args...);
+        using object_type = ClassType;
+    };
+
+    template<typename ClassType, typename ReturnType, bool Const, bool NoExcept, typename ...ArgTypes>
+    struct MethodDeclarationImpl {
+        using class_type = ClassType;
+        using return_type = ReturnType;
+        using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+        using type_decompositor = MethodTypeCompositor<ClassType, ReturnType, Const, NoExcept, ArgTypes...>;
+        using method_type = typename type_decompositor::method_type;
+        static constexpr bool is_const = Const;
+        static constexpr bool is_noexcept = NoExcept;
+        static constexpr std::size_t num_args = std::tuple_size<arg_types>::value;
+
+        constexpr MethodDeclarationImpl(method_type methodPtr, std::string_view method_name, arg_types arguments) noexcept
+            : method_ptr(methodPtr),
+              name(method_name),
+              args(arguments) {}
+
+        constexpr bool isConst() const noexcept {
+            return is_const;
+        }
+
+        constexpr bool isNoExcept() const noexcept {
+            return is_noexcept;
+        }
+
+        method_type         method_ptr;
+        std::string_view	name;
+        arg_types			args;
+
+
+        inline void invoke(void* object, void* ret, void **pArgs) const {
+            invoke_impl<0>(object, ret, pArgs);
+        }
+
+        inline void invoke(const void* object, void* ret, void **pArgs) const {
+            static_assert (is_const, "");
+            invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
+        }
+
+        inline void invoke_noexcept(void* object, void* ret, void **pArgs) const noexcept {
+            static_assert (is_noexcept, "");
+            invoke_impl<0>(object, ret, pArgs);
+        }
+
+        inline void invoke_noexcept(const void* object, void* ret, void **pArgs) const noexcept {
+            static_assert (is_const, "");
+            static_assert (is_noexcept, "");
+            invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
+        }
+
+    private:
+
+        template <int arg_index, typename ...ConvertedArgs> inline
+        void invoke_impl(void* object, void* ret, void** pArgs, ConvertedArgs ...convertedArgs) const {
+            if constexpr(arg_index < num_args) {
+                // pop an argument from the head of the tuple
+                // convert it to it's actual type
+                // and call recursively for further argument decomposition
+                auto& arg = std::get<arg_index>(args);
+                invoke_impl<arg_index+1>(
+                            object,
+                            ret,
+                            pArgs +  1,
+                            std::forward<ConvertedArgs>(convertedArgs)...,
+                            arg.narrowType(pArgs[0]));
+            } else {
+                // all arguments have already been decomposed.
+                using object_type = typename type_decompositor::object_type;
+                object_type &obj = *reinterpret_cast<object_type*>(object);
+
+                if constexpr (std::is_void<return_type>::value) {
+                    (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
+                } else {
+                    auto& returnSlot = *reinterpret_cast<return_type*>(ret);
+                    returnSlot = (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
+                }
+            }
+        }
+
+
+    };
+
+    template<typename MT>
+    struct MethodDeclaration;
+
+    template <typename MT, typename AT>
+    MethodDeclaration(MT, std::string_view, AT&&) -> MethodDeclaration<MT>;
+
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) const noexcept>
+        : public MethodDeclarationImpl<ClassType, ReturnType, true, true, ArgTypes...> {
+        using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, true, true, ArgTypes...>;
+        constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
+            : impl_ty(methodPtr, method_name, arguments) {}
+    };
+
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) const>
+        : public MethodDeclarationImpl<ClassType, ReturnType, true, false, ArgTypes...> {
+         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, true, false, ArgTypes...>;
+         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
+             : impl_ty(methodPtr, method_name, arguments) {}
+    };
+
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) noexcept>
+        : public MethodDeclarationImpl<ClassType, ReturnType, false, true, ArgTypes...> {
+         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, false, true, ArgTypes...>;
+         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
+             : impl_ty(methodPtr, method_name, arguments) {}
+    };
+
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...)>
+        : public MethodDeclarationImpl<ClassType, ReturnType, false, false, ArgTypes...> {
+         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, false, false, ArgTypes...>;
+         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
+             : impl_ty(methodPtr, method_name, arguments) {}
+    };
+
 
     template<typename Descriptor>
     struct OverloadSet {

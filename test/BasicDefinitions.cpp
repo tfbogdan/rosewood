@@ -1,6 +1,7 @@
 #include "BasicDefinitions.h"
 
 
+#include <iostream>
 
 
 void basic::PlainClass::noArgsNoReturnMethod() {
@@ -17,4 +18,8 @@ void basic::PlainClass::overloadedMethod(int) {
 
 void basic::PlainClass::overloadedMethod(void) {
 
+}
+
+void basic::PlainClass::constNoExceptFunction() const noexcept {
+    std::cerr << "basic::PlainClass::constNoExceptFunction()\n";
 }

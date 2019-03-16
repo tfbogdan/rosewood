@@ -29,16 +29,17 @@ public:
     int doubleInteger(int namedParam);
 
     void overloadedMethod();
+    void constNoExceptFunction() const noexcept;
     void overloadedMethod(int i);
 
-    float floatField;
+    float floatField = .2;
 
     enum innerEnum{
         firstEnum, secondOne, third = -3
     };
 
 private:
-    float privateFloatMember;
+    float privateFloatMember = 3;
 };
 
 }
