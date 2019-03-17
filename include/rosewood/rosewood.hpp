@@ -10,40 +10,17 @@
 namespace rosewood {
     struct nil_t {};
 
-    template <typename t1, typename t2>
-    struct tuple_cat_static;
-
-    template<typename ...tuples>
-    struct tuple_type_cat {
-        static constexpr auto apply_cat = [] () {
-            return std::apply([](auto ...tuple_types){
-                return std::tuple_cat(((tuple_types),...));
-            }, std::tuple<tuples...>{});
-        };
-        using type = decltype(apply_cat());
-    };
-
-    template <typename T>
-    constexpr decltype (auto) construct() noexcept {
-        return T();
-    }
-
-    template <template<typename> typename wrapping_type, typename Tuple>
+    template <template<typename> typename wrapping_type, typename ...Ts>
     struct tuple_elements_wrapper;
 
-    template <template<typename> typename wrapping_type>
-    struct tuple_elements_wrapper<wrapping_type, std::tuple<>> {
-        using type =std::tuple<>;
+    template <template<typename> typename wrapping_type, typename ...WrappedTupleTypes>
+    struct tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes...>, std::tuple<>> {
+        using type = std::tuple<WrappedTupleTypes...>;
     };
 
-    template <template<typename> typename wrapping_type, typename TupleHead, typename ...TupleTypes>
-    struct tuple_elements_wrapper<wrapping_type, std::tuple<TupleHead, TupleTypes...>> {
-        using type = decltype(
-            std::tuple_cat(
-                construct<std::tuple<wrapping_type<TupleHead>>>(),
-                construct<typename tuple_elements_wrapper<wrapping_type, std::tuple<TupleTypes...>>::type>()
-            )
-        );
+    template <template<typename> typename wrapping_type, typename ...WrappedTupleTypes, typename Head, typename ...UnwrappedTypes>
+    struct tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes...>, std::tuple<Head, UnwrappedTypes...>> {
+		using type = typename tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes..., wrapping_type<Head>>, std::tuple<UnwrappedTypes...>>::type;
     };
 
 	template <template<typename> typename wrapping_type, typename ...Types>
@@ -350,12 +327,10 @@ namespace rosewood {
         }
     };
 
-#ifndef _MSC_VER	// overloading on noexcept doesn't seem to work on MSVC
 	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
     MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>::arg_types &&) -> MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>;
 	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
 	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>;
-#endif // _MSVC
 	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
 	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes... >;
 	template<typename ClassType, typename ReturnType, typename ...ArgTypes>

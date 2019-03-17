@@ -17,7 +17,7 @@ namespace detail {
 
 template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
 struct range_model {
-    using wrapped_elements_tuple = typename tuple_elements_wrapper<wrapperType, sourceTupleT>::type;
+    using wrapped_elements_tuple = typename tuple_elements_wrapper<wrapperType, std::tuple<>, sourceTupleT>::type;
     static const wrapped_elements_tuple wrapped_elements;
 
     static constexpr int num_elements = std::tuple_size<sourceTupleT>::value;
