@@ -26,7 +26,7 @@ class PlainClass {
 public:
     void noArgsNoReturnMethod();
 
-    int doubleInteger(int namedParam);
+    int doubleInteger(int namedParam) const;
 
     void overloadedMethod();
     void constNoExceptFunction() const noexcept;

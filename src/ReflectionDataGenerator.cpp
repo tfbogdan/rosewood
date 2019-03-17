@@ -234,7 +234,50 @@ namespace mc {
             parameters.emplace_back(fmt::format("meta_{}", parmName));
         }
         wrap_range_in_tuple("parameters", methodScope.inner, parameters);
+        //
+
+        //
         return methodScope;
+    }
+
+    std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
+        // build the argument list
+        std::ostringstream sstream;
+        auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
+        auto exceptionSpecTempalte = functionPrototype->getExceptionSpecTemplate();
+        auto exceptionSpecifier = functionPrototype->getExceptionSpecType();
+        bool isNoExcept = false;
+        if (method->getName() == "assign") {
+            llvm::outs() << "";
+        }
+        switch (exceptionSpecifier) {
+            case clang::ExceptionSpecificationType::EST_NoexceptTrue:
+                [[fallthrough]];
+            case clang::ExceptionSpecificationType::EST_BasicNoexcept:
+                isNoExcept = true;
+            break;
+            default:
+            break;
+        }
+        sstream << method->getReturnType().getCanonicalType().getAsString(printingPolicy);
+        sstream << fmt::format(" ({}::*) (", clang::QualType(method->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy));
+        if (method->parameters().empty()) {
+
+        } else {
+            int paramIdx = 0;
+            for (const auto& parm: method->parameters()) {
+                sstream << parm->getType().getCanonicalType().getAsString(printingPolicy);
+                sstream << (paramIdx < (method->parameters().size() - 1) ? ",": "");
+                ++paramIdx;
+            }
+        }
+        sstream << ")";
+        sstream << fmt::format("{}{}",
+                               functionPrototype->isConst() ? " const" : "",
+                               isNoExcept ? " noexcept": "");
+
+        auto res = sstream.str();
+        return res;
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
@@ -242,10 +285,41 @@ namespace mc {
 
         std::vector<std::string> overloadNames;
 
+        int methodIndex = 0;
         for(const auto Method: overloads) {
             const auto overloadName = fmt::format("overload_{}", overloadNames.size());
             exportCxxMethod(overloadName, Record, Method, overloadScope);
             overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+
+
+            outerScope.putline(fmt::format("static constexpr auto {}_{} = ", Method->getNameAsString(), methodIndex));
+            outerScope.inner.increaseIndentation();
+            outerScope.putline(fmt::format("rosewood::MethodDeclaration("));
+            outerScope.inner.increaseIndentation();
+
+            outerScope.putline(fmt::format("static_cast<{}>(&{}),", buildMethodSignature(Method), Method->getQualifiedNameAsString()));
+            outerScope.putline(fmt::format("\"{}\",", Method->getNameAsString()));
+            if (Method->parameters().empty()) {
+                outerScope.putline("std::tuple<>());");
+            } else {
+                int paramIdx = 0;
+                outerScope.putline("std::tuple(");
+                outerScope.inner.increaseIndentation();
+                for (const auto& param: Method->parameters()) {
+                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}){}",
+                                                   param->getType().getCanonicalType().getAsString(printingPolicy),
+                                                   param->getNameAsString(),
+                                                   param->hasDefaultArg(),
+                                                   paramIdx < (Method->parameters().size() - 1) ? ",": ""
+                                                   ));
+                    ++paramIdx;
+                }
+                outerScope.inner.decreaseIndentation();
+                outerScope.putline("));");
+            }
+
+            outerScope.inner.decreaseIndentation();outerScope.inner.decreaseIndentation();
+            ++methodIndex;
         }
         wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
         return overloadScope;
@@ -268,11 +342,11 @@ namespace mc {
     }
 
     /*descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
-		return descriptor_scope(where.inner, "", "", "", "");
+        return descriptor_scope(where.inner, "", "", "", "");
     }
 
     descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
-		return descriptor_scope(where.inner, "", "", "", "");
+        return descriptor_scope(where.inner, "", "", "", "");
     }*/
 
     descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
@@ -298,15 +372,33 @@ namespace mc {
         for(const auto& field: fields) {
             auto fieldScope = outerScope.spawn(field->getNameAsString(), "rosewood::Field");
             printingPolicy.FullyQualifiedName = true;
-			exportType("type", field->getType(), fieldScope);
+            exportType("type", field->getType(), fieldScope);
         }
+    }
+
+    bool ReflectionDataGenerator::areMethodArgumentsPubliclyUsable(const clang::CXXMethodDecl* method) {
+        for (const auto& param: method->parameters()) {
+            auto parmType = param->getType();
+            if (parmType->isRecordType()) {
+                auto record = parmType->getAsRecordDecl();
+                if (!record->getAccess() == clang::AccessSpecifier::AS_public) {
+                    return false;
+                }
+            } // this will likely need to be extended to cover more cases
+        }
+        auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
+        auto exceptionSpecKind = functionPrototype->getExceptionSpecType();
+        // cannot export a function if we cannot reliably determine it's exception specification
+        // since that's part of the c++17 type system
+        return  exceptionSpecKind != clang::ExceptionSpecificationType::EST_Uninstantiated &&
+                exceptionSpecKind != clang::ExceptionSpecificationType::EST_DependentNoexcept;
     }
 
 
     descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
         auto ownScope = where.spawn(name, "rosewood::Class");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
-		ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
+        ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
         std::map<std::string_view, std::set<std::string>> descriptornames = {
             {"classes", {}},
             {"overload_sets", {}},
@@ -335,6 +427,7 @@ namespace mc {
             switch (decl->getKind()) {
             case clang::Decl::Kind::CXXMethod: {
                 auto method = static_cast<const clang::CXXMethodDecl*>(decl);
+                if (!areMethodArgumentsPubliclyUsable(method)) continue;
                 // TDO: the other half
                 if (!method->isOverloadedOperator()) {
                     const auto methodName = method->getNameAsString();
@@ -348,6 +441,7 @@ namespace mc {
             } break;
             case clang::Decl::Kind::CXXConstructor: {
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
+                if (!areMethodArgumentsPubliclyUsable(ctor)) continue;
                 if(!ctor->isDeleted()) {
                     constructors.push_back(ctor);
                 }
@@ -357,6 +451,7 @@ namespace mc {
             } break;
             case clang::Decl::Kind::CXXConversion: {
                 auto conv = static_cast<const clang::CXXConversionDecl*>(decl);
+                if (!areMethodArgumentsPubliclyUsable(conv)) continue;
                 conversions.push_back(conv);
             } break;
             case clang::Decl::Kind::Field: {
@@ -379,7 +474,7 @@ namespace mc {
 
             default:
                 break;
-            }        
+            }
         }
 
         if (constructors.size()) {

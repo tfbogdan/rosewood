@@ -62,6 +62,14 @@ struct scope {
         return scope(out, indentation+1);
     }
 
+    void increaseIndentation() {
+        ++indentation;
+    }
+
+    void decreaseIndentation() {
+        --indentation;
+    }
+
 private:
     std::ostream &out;
 protected:
@@ -84,7 +92,7 @@ struct descriptor_scope {
         name(std::move(other.name)),
         kind(std::move(other.kind)),
         qualifiedName(std::move(other.kind)),
-		printed_header(other.printed_header) {
+        printed_header(other.printed_header) {
         other.moved = true;
     }
 
@@ -121,6 +129,7 @@ struct descriptor_scope {
         }
     }
 
+
     scope spawn() {
         print_header();
         return outer.spawn();
@@ -154,6 +163,8 @@ private:
         descriptor_scope exportEnum(const clang::EnumDecl *Enum, descriptor_scope &where);
         descriptor_scope exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where);
 
+        bool areMethodArgumentsPubliclyUsable(const clang::CXXMethodDecl* method);
+
         descriptor_scope exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &where);
         descriptor_scope exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
         descriptor_scope exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
@@ -164,6 +175,7 @@ private:
         void exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &where);
 
         void genMethodCallUnpacker(const clang::CXXMethodDecl *method);
+        std::string buildMethodSignature(const clang::CXXMethodDecl *method);
 
         std::ofstream out;
         mc::IdentifierHelper idman;

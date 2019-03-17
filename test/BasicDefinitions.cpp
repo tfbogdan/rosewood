@@ -8,7 +8,7 @@ void basic::PlainClass::noArgsNoReturnMethod() {
 
 }
 
-int basic::PlainClass::doubleInteger(int param) {
+int basic::PlainClass::doubleInteger(int param) const {
     return param * 2;
 }
 

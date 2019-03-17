@@ -118,7 +118,7 @@ TEST(mc, runtime_searches) {
 
     aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
     EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
-    EXPECT_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs), rosewood::const_corectness_error);
+    EXPECT_NO_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs));
 }
 
 TEST(mc, string_wrap) {
@@ -148,8 +148,8 @@ TEST(mc, index) {
               "doubleInteger",
               std::tuple(rosewood::FunctionParameter<int>("namedParam", false)));
     EXPECT_TRUE(method.isConst());
-    EXPECT_FALSE(otherMethod.isConst());
-    basic::PlainClass plainClass;
+    EXPECT_TRUE(otherMethod.isConst());
+    const basic::PlainClass plainClass;
     method.invoke(&plainClass, nullptr, nullptr);
 
     int returnSlot;
