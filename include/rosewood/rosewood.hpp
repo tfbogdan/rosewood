@@ -46,6 +46,20 @@ namespace rosewood {
         );
     };
 
+	template <template<typename> typename wrapping_type, typename ...Types>
+	struct arguments_wrapper;
+
+	template <template<typename> typename wrapping_type, typename ...TupleTypes>
+	struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>> {
+		using type = std::tuple<TupleTypes...>;
+	};
+
+	template <template<typename> typename wrapping_type, typename Head, typename ...Types, typename ...TupleTypes>
+	struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>, Head, Types...> {
+		using type = typename arguments_wrapper<wrapping_type, std::tuple<TupleTypes..., wrapping_type<Head>>, Types...>::type;
+	};
+
+
 
     template <typename T>
     struct tuple_seeker;
@@ -162,8 +176,8 @@ namespace rosewood {
         constexpr FunctionParameter(const FunctionParameter&) noexcept = default;
         constexpr FunctionParameter(FunctionParameter&&) noexcept = default;
 
-        std::string_view name;
-        bool isDefaulted;
+        std::string_view name = "";
+        bool isDefaulted = false;
 
         // Is a reference the correct type to work with here?
         // certainly needs a bit of looking into
@@ -175,6 +189,18 @@ namespace rosewood {
             return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
         }
     };
+
+#ifdef _MSC_VER	// MSVC strips constness when deducing function parameter types. 
+	template <typename ArgType>
+	struct FunctionParameter<const ArgType> : public FunctionParameter<ArgType> {
+		using impl_t = FunctionParameter<ArgType>;
+		using type_t = FunctionParameter<const ArgType>;
+
+		constexpr type_t(std::string_view argName, bool hasDefaultValue) noexcept
+			:impl_t(argName, hasDefaultValue) {}
+	};
+
+#endif // _MSC_VER
 
     template <typename ClassType, typename ReturnType, bool Const, bool NoExcept, typename ...Args>
     struct MethodTypeCompositor;
@@ -204,20 +230,20 @@ namespace rosewood {
     };
 
     template<typename ClassType, typename ReturnType, bool Const, bool NoExcept, typename ...ArgTypes>
-    struct MethodDeclarationImpl {
+    struct MethodDeclaration {
         using class_type = ClassType;
         using return_type = ReturnType;
-        using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+        using arg_types = typename arguments_wrapper<FunctionParameter, std::tuple<>, ArgTypes...>::type;
         using type_decompositor = MethodTypeCompositor<ClassType, ReturnType, Const, NoExcept, ArgTypes...>;
         using method_type = typename type_decompositor::method_type;
         static constexpr bool is_const = Const;
         static constexpr bool is_noexcept = NoExcept;
         static constexpr std::size_t num_args = std::tuple_size<arg_types>::value;
 
-        constexpr MethodDeclarationImpl(method_type methodPtr, std::string_view method_name, arg_types arguments) noexcept
+        constexpr MethodDeclaration(method_type methodPtr, std::string_view method_name, arg_types &&arguments) noexcept
             : method_ptr(methodPtr),
               name(method_name),
-              args(arguments) {}
+              args(std::move(arguments)) {}
 
         constexpr bool isConst() const noexcept {
             return is_const;
@@ -285,7 +311,7 @@ namespace rosewood {
     template <typename ClassType, bool NoExcept, typename ...ArgTypes>
     struct ConstructorDeclaration {
         using class_type = ClassType;
-        using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+        using arg_types = typename arguments_wrapper<FunctionParameter, std::tuple<>, ArgTypes...>::type;
         static constexpr unsigned num_args = std::tuple_size<arg_types>::value;
         static constexpr bool is_noexcept = NoExcept;
 
@@ -324,43 +350,16 @@ namespace rosewood {
         }
     };
 
-    template<typename MT>
-    struct MethodDeclaration;
-
-    template <typename MT, typename AT>
-    MethodDeclaration(MT, std::string_view, AT&&) -> MethodDeclaration<MT>;
-
-    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) const noexcept>
-        : public MethodDeclarationImpl<ClassType, ReturnType, true, true, ArgTypes...> {
-        using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, true, true, ArgTypes...>;
-        constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
-            : impl_ty(methodPtr, method_name, arguments) {}
-    };
-
-    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) const>
-        : public MethodDeclarationImpl<ClassType, ReturnType, true, false, ArgTypes...> {
-         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, true, false, ArgTypes...>;
-         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
-             : impl_ty(methodPtr, method_name, arguments) {}
-    };
-
-    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...) noexcept>
-        : public MethodDeclarationImpl<ClassType, ReturnType, false, true, ArgTypes...> {
-         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, false, true, ArgTypes...>;
-         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
-             : impl_ty(methodPtr, method_name, arguments) {}
-    };
-
-    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-    struct MethodDeclaration<ReturnType (ClassType::*)(ArgTypes...)>
-        : public MethodDeclarationImpl<ClassType, ReturnType, false, false, ArgTypes...> {
-         using impl_ty = MethodDeclarationImpl<ClassType, ReturnType, false, false, ArgTypes...>;
-         constexpr MethodDeclaration(typename impl_ty::method_type methodPtr, std::string_view method_name, typename impl_ty::arg_types arguments) noexcept
-             : impl_ty(methodPtr, method_name, arguments) {}
-    };
+#ifndef _MSC_VER	// overloading on noexcept doesn't seem to work on MSVC
+	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>::arg_types &&) -> MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>;
+	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>;
+#endif // _MSVC
+	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes... >;
+	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...), std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>;
 
 
     template<typename Descriptor>

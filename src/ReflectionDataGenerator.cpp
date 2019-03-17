@@ -259,7 +259,8 @@ namespace mc {
 
     std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
         // build the argument list
-        std::ostringstream sstream;
+		llvm::SmallVector<char, 1024> buff;
+		llvm::raw_svector_ostream sstream(buff);
         auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
         bool noExcept = isNoExcept(method);
         sstream << method->getReturnType().getCanonicalType().getAsString(printingPolicy);
@@ -279,7 +280,7 @@ namespace mc {
                                functionPrototype->isConst() ? " const" : "",
                                noExcept ? " noexcept": "");
 
-        auto res = sstream.str();
+        auto res = sstream.str().str();
         return res;
     }
 
@@ -449,8 +450,9 @@ namespace mc {
             case clang::Decl::Kind::CXXMethod: {
                 auto method = static_cast<const clang::CXXMethodDecl*>(decl);
                 if (!areMethodArgumentsPubliclyUsable(method)) continue;
-                const auto methodName = method->getNameAsString();
-                exportedMethods.push_back(method);
+				if (!method->isStatic() && !method->isDeleted()) {
+					exportedMethods.push_back(method);
+				}
             } break;
             case clang::Decl::Kind::CXXConstructor: {
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
