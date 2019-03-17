@@ -14,7 +14,7 @@ namespace rosewood {
     };
 
 namespace detail {
-	
+
 template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
 struct range_model {
     using wrapped_elements_tuple = typename tuple_elements_wrapper<wrapperType, sourceTupleT>::type;
@@ -154,7 +154,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     template <typename Descriptor>
     class DEnumeratorWrapper : public DEnumerator {
     public:
-		DEnumeratorWrapper(const Descriptor &d) : descriptor(d) {}
+        DEnumeratorWrapper(const Descriptor &d) : descriptor(d) {}
 
         inline virtual std::string_view getName() const noexcept final {
             return descriptor.name;
@@ -164,7 +164,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return descriptor.value;
         }
 
-		const Descriptor descriptor;
+        const Descriptor descriptor;
     };
 
     class DEnum : public DMetaDecl {
@@ -186,10 +186,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline virtual std::vector<const DEnumerator*> getEnumerators() const noexcept final {
-			std::vector<const DEnumerator*> result; result.reserve(enumerators.size());
-			for (const auto &en : enumerators) {
-				result.emplace_back(&en);
-			}
+            std::vector<const DEnumerator*> result; result.reserve(enumerators.size());
+            for (const auto &en : enumerators) {
+                result.emplace_back(&en);
+            }
             return result;
         }
 
@@ -197,19 +197,19 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         static const std::vector<DEnumeratorWrapper<typename descriptor::enumerator_type>> enumerators;
     };
 
-	template<typename MetaEnum>
-	std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> initEnumeratorsVector() {
-		std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> result;
-		result.reserve(MetaEnum::enumerators.size());
-		for (const auto &en: MetaEnum::enumerators) {
-			result.emplace_back(en);
-		}
-		return result;
-	}
+    template<typename MetaEnum>
+    std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> initEnumeratorsVector() {
+        std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> result;
+        result.reserve(MetaEnum::enumerators.size());
+        for (const auto &en: MetaEnum::enumerators) {
+            result.emplace_back(en);
+        }
+        return result;
+    }
 
     template<typename MetaEnum>
-	const std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> DEnumWrapper<MetaEnum>::enumerators =
-		initEnumeratorsVector<MetaEnum>();
+    const std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> DEnumWrapper<MetaEnum>::enumerators =
+        initEnumeratorsVector<MetaEnum>();
 
     class DClass;
 
@@ -355,7 +355,6 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     public:
         virtual ~DClass() = 0;
         virtual bool hasMethod(std::string_view name) const noexcept = 0;
-        virtual const DOverloadSet *findOverloadSet(std::string_view name) const noexcept(false) = 0;
         virtual const DField *findField(std::string_view name) const noexcept(false) = 0;
         virtual const DClass *asClass() const noexcept final;
     private:
@@ -373,8 +372,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline virtual bool hasMethod(std::string_view name) const noexcept final {
-            descriptor desc;
-            return desc.has_overload_set(name);
+            return false;
         }
 
         inline virtual const DClass *findChildClass(std::string_view name) const noexcept(false) final {
@@ -385,29 +383,22 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return enums.element_map.at(name);
         }
 
-        inline virtual const DOverloadSet *findOverloadSet(std::string_view name) const noexcept(false) final {
-            return overload_sets.element_map.at(name);
-        }
-
         inline virtual const DField *findField(std::string_view name) const noexcept(false) final {
-            return fields.element_map.at(name);
+            return nullptr; // fields.element_map.at(name);
         }
 
     private:
         using enum_range = detail::range_model<typename MetaClass::enums, DEnum, DEnumWrapper>;
         static constexpr enum_range enums = {};
 
-		template<typename T>
-		using disambiguator = DClassWrapper<T>;
+        template<typename T>
+        using disambiguator = DClassWrapper<T>;
 
         using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
         static constexpr class_range classes = {};
 
-        using overload_set_model = detail::range_model<typename descriptor::overload_sets, DOverloadSet, DOverloadSetWrapper>;
-        static constexpr overload_set_model overload_sets {};
-
-         using field_model = detail::range_model<typename descriptor::fields, DField, DFieldWrapper>;
-        static constexpr field_model  fields {};
+        // using field_model = detail::range_model<typename descriptor::fields, DField, DFieldWrapper>;
+        // static constexpr field_model  fields {};
     };
 
 
@@ -459,8 +450,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using class_range = detail::range_model<typename MetaNamespace::classes, DClass, DClassWrapper>;
         static constexpr class_range classes = {};
 
-		template <typename T>
-		using disambiguator = DNamespaceWrapper<T>;
+        template <typename T>
+        using disambiguator = DNamespaceWrapper<T>;
         using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, disambiguator>;
         static constexpr namespaces_model namespaces {};
     };

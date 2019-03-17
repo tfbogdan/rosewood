@@ -280,8 +280,48 @@ namespace rosewood {
                 }
             }
         }
+    };
 
+    template <typename ClassType, bool NoExcept, typename ...ArgTypes>
+    struct ConstructorDeclaration {
+        using class_type = ClassType;
+        using arg_types = typename tuple_elements_wrapper<FunctionParameter, std::tuple<ArgTypes...>>::type;
+        static constexpr unsigned num_args = std::tuple_size<arg_types>::value;
+        static constexpr bool is_noexcept = NoExcept;
 
+        arg_types arguments;
+
+        constexpr ConstructorDeclaration(arg_types&& args) noexcept
+            :arguments(args) {}
+
+        inline void invoke(void* object, void **pArgs) const {
+            invoke_impl<0>(object, pArgs);
+        }
+
+        inline void invoke_noexcept(void* object, void **pArgs) const noexcept {
+            static_assert (is_noexcept, "");
+            invoke_impl<0>(object, pArgs);
+        }
+
+    private:
+
+        template <int arg_index, typename ...ConvertedArgs> inline
+        void invoke_impl(void* addr, void** pArgs, ConvertedArgs ...convertedArgs) const {
+            if constexpr(arg_index < num_args) {
+                // pop an argument from the head of the tuple
+                // convert it to it's actual type
+                // and call recursively for further argument decomposition
+                auto& arg = std::get<arg_index>(arguments);
+                invoke_impl<arg_index+1>(
+                            addr,
+                            pArgs +  1,
+                            std::forward<ConvertedArgs>(convertedArgs)...,
+                            arg.narrowType(pArgs[0]));
+            } else {
+                // all arguments have already been decomposed.
+                new (addr) class_type(std::forward<ConvertedArgs>(convertedArgs)...);
+            }
+        }
     };
 
     template<typename MT>
@@ -360,6 +400,20 @@ namespace rosewood {
     template<typename Descriptor>
     struct Field {};
 
+    template <typename Type, typename ClassType>
+    struct FieldDeclaration {
+        using type_t = Type;
+        using address_type = Type ClassType::*;
+
+        constexpr FieldDeclaration(std::string_view nm, address_type addr)
+            :name(nm),
+            address(addr) {}
+
+        std::string_view name;
+        address_type address;
+
+    };
+
     template <typename tupleT, typename pred>
     constexpr auto get_by_name(tupleT, pred p) noexcept {
         static_assert (std::tuple_size<tupleT>::value > 0, "no element found with ::name == pred::pred");
@@ -376,27 +430,18 @@ namespace rosewood {
     struct Class {
 
         using descriptor = Descriptor;
-        constexpr bool has_overload_set(std::string_view Name) const noexcept {
-            using methods_tuple = typename descriptor::overload_sets;
+        constexpr bool has_method(std::string_view Name) const noexcept {
             return std::apply([Name] (auto ...meth) {
                 return (... || (meth.name == Name));
-            }, methods_tuple());
+            }, Descriptor::methods);
         }
 
         template<typename visitorT>
-        constexpr void visit_overload_sets(visitorT visitor) const noexcept {
-            using overload_sets = typename descriptor::overload_sets;
+        constexpr void visit_methods(visitorT visitor) const noexcept {
             std::apply([visitor](auto ...overloads) {
                 (visitor(overloads), ...);
-            }, overload_sets());
+            }, Descriptor::methods);
         }
-
-        template<typename predicate>
-        constexpr auto get_overload_set(predicate pred) const noexcept {
-            using overloads_sets = typename descriptor::overload_sets;
-            return get_by_name(overloads_sets(), pred);
-        }
-
     };
 
 

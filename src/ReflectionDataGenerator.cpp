@@ -240,25 +240,28 @@ namespace mc {
         return methodScope;
     }
 
-    std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
-        // build the argument list
-        std::ostringstream sstream;
+    bool isNoExcept(const clang::CXXMethodDecl *method) {
+        bool isIt = false;
         auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
-        auto exceptionSpecTempalte = functionPrototype->getExceptionSpecTemplate();
         auto exceptionSpecifier = functionPrototype->getExceptionSpecType();
-        bool isNoExcept = false;
-        if (method->getName() == "assign") {
-            llvm::outs() << "";
-        }
+
         switch (exceptionSpecifier) {
             case clang::ExceptionSpecificationType::EST_NoexceptTrue:
                 [[fallthrough]];
             case clang::ExceptionSpecificationType::EST_BasicNoexcept:
-                isNoExcept = true;
+                isIt = true;
             break;
             default:
             break;
         }
+        return isIt;
+    }
+
+    std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
+        // build the argument list
+        std::ostringstream sstream;
+        auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
+        bool noExcept = isNoExcept(method);
         sstream << method->getReturnType().getCanonicalType().getAsString(printingPolicy);
         sstream << fmt::format(" ({}::*) (", clang::QualType(method->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy));
         if (method->parameters().empty()) {
@@ -274,37 +277,32 @@ namespace mc {
         sstream << ")";
         sstream << fmt::format("{}{}",
                                functionPrototype->isConst() ? " const" : "",
-                               isNoExcept ? " noexcept": "");
+                               noExcept ? " noexcept": "");
 
         auto res = sstream.str();
         return res;
     }
 
-    descriptor_scope ReflectionDataGenerator::exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        auto overloadScope = outerScope.spawn(name, "rosewood::OverloadSet");
-
-        std::vector<std::string> overloadNames;
+    void ReflectionDataGenerator::exportMethods(const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &methods, descriptor_scope &outerScope) {
 
         int methodIndex = 0;
-        for(const auto Method: overloads) {
-            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
-            exportCxxMethod(overloadName, Record, Method, overloadScope);
-            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
 
+        outerScope.putline("static constexpr std::tuple methods {{");
+        ++outerScope.inner;
+        for(const auto Method: methods) {
+            const bool isLast = methodIndex == (methods.size() - 1);
 
-            outerScope.putline(fmt::format("static constexpr auto {}_{} = ", Method->getNameAsString(), methodIndex));
-            outerScope.inner.increaseIndentation();
-            outerScope.putline(fmt::format("rosewood::MethodDeclaration("));
-            outerScope.inner.increaseIndentation();
+            outerScope.putline("rosewood::MethodDeclaration {{");
+            ++outerScope.inner;
 
             outerScope.putline(fmt::format("static_cast<{}>(&{}),", buildMethodSignature(Method), Method->getQualifiedNameAsString()));
             outerScope.putline(fmt::format("\"{}\",", Method->getNameAsString()));
             if (Method->parameters().empty()) {
-                outerScope.putline("std::tuple<>());");
+                outerScope.putline("std::tuple{{}}}}{}", isLast ? "" : ",");
             } else {
                 int paramIdx = 0;
-                outerScope.putline("std::tuple(");
-                outerScope.inner.increaseIndentation();
+                outerScope.putline("std::tuple{{");
+                ++outerScope.inner;
                 for (const auto& param: Method->parameters()) {
                     outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}){}",
                                                    param->getType().getCanonicalType().getAsString(printingPolicy),
@@ -314,54 +312,63 @@ namespace mc {
                                                    ));
                     ++paramIdx;
                 }
-                outerScope.inner.decreaseIndentation();
-                outerScope.putline("));");
+                --outerScope.inner;
+                outerScope.putline("}}}}{}", isLast ? "" : ",");
             }
-
-            outerScope.inner.decreaseIndentation();outerScope.inner.decreaseIndentation();
+            --outerScope.inner;
             ++methodIndex;
         }
-        wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
-        return overloadScope;
+        --outerScope.inner;
+        outerScope.putline("}};");
     }
 
-    descriptor_scope ReflectionDataGenerator::exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope) {
-        auto opScope = outerScope.spawn(name, "rosewood::Operator");
-        std::vector<std::string> overloadNames;
+    void ReflectionDataGenerator::exportConstructors(const std::vector<const clang::CXXConstructorDecl*> &ctors, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
+        int methodIndex = 0;
 
-        for(const auto Method: overloads) {
-            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
-            auto overloadScope = exportCxxMethod(overloadName, record, Method, opScope);
-            const auto spelling = clang::getOperatorSpelling(Method->getOverloadedOperator());
-            overloadScope.putline("static constexpr std::string_view spelling = \"{}\";", spelling);
-            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
+        outerScope.putline("static constexpr std::tuple constructors {{");
+        ++outerScope.inner;
+        for(const auto ctor: ctors) {
+            const bool isLast = methodIndex == (ctors.size() - 1);
+            const bool noExcept = isNoExcept(ctor);
+            outerScope.inner.put("rosewood::ConstructorDeclaration<{}, {}", clang::QualType(record->getTypeForDecl(), 0).getAsString(printingPolicy), noExcept);
+
+            if (ctor->parameters().empty()) {
+                outerScope.inner.rawput("> {{\n");
+            } else {
+                int paramIdx = 0;
+                outerScope.inner.rawput(", ");
+                for (const auto& param: ctor->parameters()) {
+                    outerScope.inner.rawput("{}{}", param->getType().getCanonicalType().getAsString(printingPolicy), paramIdx < (ctor->parameters().size() - 1) ? ",": "");
+                    ++paramIdx;
+                }
+                outerScope.inner.rawput("> {{\n");
+            }
+
+            ++outerScope.inner;
+
+            if (ctor->parameters().empty()) {
+                outerScope.putline("std::tuple{{}}}}{}", isLast ? "" : ",");
+            } else {
+                int paramIdx = 0;
+                outerScope.putline("std::tuple{{");
+                ++outerScope.inner;
+                for (const auto& param: ctor->parameters()) {
+                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}){}",
+                                                   param->getType().getCanonicalType().getAsString(printingPolicy),
+                                                   param->getNameAsString(),
+                                                   param->hasDefaultArg(),
+                                                   paramIdx < (ctor->parameters().size() - 1) ? ",": ""
+                                                   ));
+                    ++paramIdx;
+                }
+                --outerScope.inner;
+                outerScope.putline("}}}}{}", isLast ? "" : ",");
+            }
+            --outerScope.inner;
+            ++methodIndex;
         }
-        wrap_range_in_tuple("overloads", opScope.inner, overloadNames);
-
-        return opScope;
-    }
-
-    /*descriptor_scope ReflectionDataGenerator::exportCxxStaticOperator(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
-        return descriptor_scope(where.inner, "", "", "", "");
-    }
-
-    descriptor_scope ReflectionDataGenerator::exportFunctions(const std::string &, const std::vector<const clang::FunctionDecl*> &, descriptor_scope &where) {
-        return descriptor_scope(where.inner, "", "", "", "");
-    }*/
-
-    descriptor_scope ReflectionDataGenerator::exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
-        static const std::string name = "constructor";
-        auto overloadScope = outerScope.spawn(name, "rosewood::ConstructorSet");
-
-        std::vector<std::string> overloadNames;
-
-        for(const auto Method: overloads) {
-            const auto overloadName = fmt::format("overload_{}", overloadNames.size());
-            exportCxxMethod(overloadName, record, Method, overloadScope);
-            overloadNames.emplace_back(fmt::format("meta_{}", overloadName));
-        }
-        wrap_range_in_tuple("overloads", overloadScope.inner, overloadNames);
-        return overloadScope;
+        --outerScope.inner;
+        outerScope.putline("}};");
     }
 
     descriptor_scope ReflectionDataGenerator::exportCxxDestructor(const clang::CXXDestructorDecl *Dtor, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
@@ -369,10 +376,26 @@ namespace mc {
     }
 
     void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
-        for(const auto& field: fields) {
-            auto fieldScope = outerScope.spawn(field->getNameAsString(), "rosewood::Field");
-            printingPolicy.FullyQualifiedName = true;
-            exportType("type", field->getType(), fieldScope);
+        outerScope.put("static constexpr std::tuple fields {{");
+        if (fields.empty()) {
+            outerScope.inner.rawput("}};\n");
+        } else {
+            outerScope.inner.rawput("\n");
+            ++outerScope.inner;
+            int fIndex = 0;
+            for(const auto& field: fields) {
+                const bool notLast = fIndex < (fields.size() - 1);
+                outerScope.putline("rosewood::FieldDeclaration<{}, {}>{{\"{}\", &{}::{}}}{}",
+                                   field->getType().getCanonicalType().getAsString(printingPolicy),
+                                   clang::QualType(field->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy),
+                                   field->getNameAsString(),
+                                   clang::QualType(field->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy),
+                                   field->getNameAsString(),
+                                   notLast ? "," : "");
+                ++fIndex;
+            }
+            --outerScope.inner;
+            outerScope.inner.putline("}};");
         }
     }
 
@@ -391,7 +414,8 @@ namespace mc {
         // cannot export a function if we cannot reliably determine it's exception specification
         // since that's part of the c++17 type system
         return  exceptionSpecKind != clang::ExceptionSpecificationType::EST_Uninstantiated &&
-                exceptionSpecKind != clang::ExceptionSpecificationType::EST_DependentNoexcept;
+                exceptionSpecKind != clang::ExceptionSpecificationType::EST_DependentNoexcept &&
+                exceptionSpecKind != clang::ExceptionSpecificationType::EST_Unevaluated;
     }
 
 
@@ -401,15 +425,9 @@ namespace mc {
         ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
         std::map<std::string_view, std::set<std::string>> descriptornames = {
             {"classes", {}},
-            {"overload_sets", {}},
-            {"operators", {}}, // not 100% these shouldn't just be treated as any other methods
-            {"fields", {}},
             {"enums", {}}
         };
 
-        // in order to do overloading we need to do three passes over all methods
-        std::map<std::string, std::vector<const clang::CXXMethodDecl*>> method_groups;
-        std::map<std::string, std::vector<const clang::CXXMethodDecl*>> overloaded_operators;
         // std::map<llvm::StringRef, std::vector<const clang::FunctionDecl*>> function_groups;
         // std::map<std::string, std::vector<const clang::FunctionDecl*>> static_operator_groups;
         std::vector<const clang::CXXConstructorDecl*> constructors;
@@ -418,26 +436,21 @@ namespace mc {
         std::vector<const clang::CXXRecordDecl*> classes;
         std::vector<const clang::EnumDecl*> enums;
 
+        std::vector<const clang::CXXMethodDecl*> exportedMethods;
+
         // std::vector<const clang::Decl*> decls;
         const clang::CXXDestructorDecl *destructor = nullptr;
 
         for(const auto decl: Record->decls()) {
             // first trim out non public members
             if(decl->getAccess() != clang::AccessSpecifier::AS_public) continue;
+
             switch (decl->getKind()) {
             case clang::Decl::Kind::CXXMethod: {
                 auto method = static_cast<const clang::CXXMethodDecl*>(decl);
                 if (!areMethodArgumentsPubliclyUsable(method)) continue;
-                // TDO: the other half
-                if (!method->isOverloadedOperator()) {
-                    const auto methodName = method->getNameAsString();
-                    method_groups[methodName].push_back(method);
-                    descriptornames["overload_sets"].insert(fmt::format("meta_{}", methodName));
-                } else {
-                    const auto opName = fmt::format("operator_{}", overloaded_operators.size());
-                    overloaded_operators[opName].push_back(method);
-                    descriptornames["operators"].insert(fmt::format("meta_{}", opName));
-                }
+                const auto methodName = method->getNameAsString();
+                exportedMethods.push_back(method);
             } break;
             case clang::Decl::Kind::CXXConstructor: {
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
@@ -457,7 +470,6 @@ namespace mc {
             case clang::Decl::Kind::Field: {
                 auto field = static_cast<const clang::FieldDecl*>(decl);
                 fields.push_back(field);
-                descriptornames["fields"].insert(fmt::format("meta_{}", field->getNameAsString()));
             } break;
             case clang::Decl::Kind::CXXRecord: {
                 auto cls = static_cast<const clang::CXXRecordDecl*>(decl);
@@ -477,17 +489,11 @@ namespace mc {
             }
         }
 
-        if (constructors.size()) {
-            exportCxxConstructors(constructors, Record, ownScope);
-        }
-        for(const auto &[grpName, grp]: method_groups) {
-            exportCxxMethodGroup(grpName, Record, grp, ownScope);
-        }
-
-        for(const auto &[opName, opGrp]: overloaded_operators) {
-            exportCxxOperator(opName, Record, opGrp, ownScope);
-        }
-
+        exportConstructors(constructors, Record, ownScope);
+        //for(const auto &[grpName, grp]: method_groups) {
+        //    exportCxxMethodGroup(grpName, Record, grp, ownScope);
+        //}
+        exportMethods(Record, exportedMethods, ownScope);
         exportFields(fields, ownScope);
         if (destructor != nullptr) {
             exportCxxDestructor(destructor, Record, ownScope);

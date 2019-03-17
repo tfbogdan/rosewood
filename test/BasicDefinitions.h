@@ -24,6 +24,10 @@ struct podStruct {
 
 class PlainClass {
 public:
+    PlainClass() = default;
+    PlainClass(const PlainClass&) = default;
+    PlainClass(PlainClass&&) noexcept = default;
+
     void noArgsNoReturnMethod();
 
     int doubleInteger(int namedParam) const;

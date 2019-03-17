@@ -62,13 +62,16 @@ struct scope {
         return scope(out, indentation+1);
     }
 
-    void increaseIndentation() {
+    scope& operator++() {
         ++indentation;
+        return *this;
     }
 
-    void decreaseIndentation() {
+    scope& operator--() {
         --indentation;
+        return *this;
     }
+
 
 private:
     std::ostream &out;
@@ -166,11 +169,11 @@ private:
         bool areMethodArgumentsPubliclyUsable(const clang::CXXMethodDecl* method);
 
         descriptor_scope exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &where);
-        descriptor_scope exportCxxMethodGroup(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
+        void exportMethods(const clang::CXXRecordDecl *Record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &outerScope);
         descriptor_scope exportCxxOperator(const std::string &name, const clang::CXXRecordDecl *record, const std::vector<const clang::CXXMethodDecl*> &overloads, descriptor_scope &where);
         descriptor_scope exportCxxStaticOperator(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where);
         descriptor_scope exportFunctions(const std::string &name, const std::vector<const clang::FunctionDecl*> &overloads, descriptor_scope &where);
-        descriptor_scope exportCxxConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &where);
+        void exportConstructors(const std::vector<const clang::CXXConstructorDecl*> &overloads, const clang::CXXRecordDecl *record, descriptor_scope &where);
         descriptor_scope exportCxxDestructor(const clang::CXXDestructorDecl *Dtor, const clang::CXXRecordDecl *record, descriptor_scope &where);
         void exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &where);
 
