@@ -272,36 +272,43 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     template <typename Descriptor>
     class DMethodWrapper : public DMethod {
     public:
+
+		DMethodWrapper(const Descriptor& desc)
+			:descriptor(desc) {
+		}
+
         inline virtual std::string_view getName() const noexcept final {
-            return Descriptor::name;
+            return descriptor.name;
         }
 
         virtual void call(const void *object, void *retValAddr, void **args) const final {
             if constexpr (Descriptor::is_const) {
-                Descriptor::fastcall(object, retValAddr, args);
+				return descriptor.invoke(object, retValAddr, args);
             } else {
                 throw const_corectness_error("non const method called on const object");
             }
         }
 
         inline virtual void call(void *object, void *retValAddr, void **args) const final {
-            Descriptor::fastcall(object, retValAddr, args);
+			descriptor.invoke(object, retValAddr, args);
         }
 
         inline virtual const DType *getReturnType() const noexcept final {
-            return &returntype;
+			return nullptr; //  &returntype;
         }
 
     private:
-        using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
-        static constexpr parameter_model parameters {};
+        // using parameter_model = detail::range_model<typename Descriptor::parameters, DParameter, DParameterWrapper>;
+        // static constexpr parameter_model parameters {};
 
-        using return_type = DTypeWrapper<decltype(Descriptor::return_type)>;
-        static const return_type returntype;
+        // using return_type = DTypeWrapper<Descriptor::return_type>;
+        // static const return_type returntype;
+
+		Descriptor descriptor;
     };
 
-    template <typename Descriptor>
-    const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype(Descriptor::return_type);
+    // template <typename Descriptor>
+    // const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype(Descriptor::return_type);
 
     class DOverloadSet : public DMetaDecl {
     public:
@@ -354,7 +361,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DClass : public DMetaDecl, public DClassContainer, public DEnumContainer {
     public:
         virtual ~DClass() = 0;
-        virtual bool hasMethod(std::string_view name) const noexcept = 0;
+        virtual const DMethod *findMethod(std::string_view name) const noexcept = 0;
         virtual const DField *findField(std::string_view name) const noexcept(false) = 0;
         virtual const DClass *asClass() const noexcept final;
     private:
@@ -365,25 +372,30 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     public:
         using descriptor = MetaClass;
 
-        inline virtual ~DClassWrapper() = default;
+		DClassWrapper() 
+			: method_map(initialize_method_map()) {}
 
-        inline virtual std::string_view getName() const noexcept final {
+        inline ~DClassWrapper() = default;
+
+        inline std::string_view getName() const noexcept final {
             return descriptor::name;
         }
 
-        inline virtual bool hasMethod(std::string_view name) const noexcept final {
-            return false;
+        inline const DMethod *findMethod(std::string_view name) const noexcept final {
+			// bool found;
+
+			return nullptr;
         }
 
-        inline virtual const DClass *findChildClass(std::string_view name) const noexcept(false) final {
-            return  classes.element_map.at(name);
+        inline const DClass *findChildClass(std::string_view name) const noexcept(false) final {
+            return classes.element_map.at(name);
         }
 
-        inline virtual const DEnum *findChildEnum(std::string_view name) const noexcept(false) final {
+        inline const DEnum *findChildEnum(std::string_view name) const noexcept(false) final {
             return enums.element_map.at(name);
         }
 
-        inline virtual const DField *findField(std::string_view name) const noexcept(false) final {
+        inline const DField *findField(std::string_view name) const noexcept(false) final {
             return nullptr; // fields.element_map.at(name);
         }
 
@@ -397,6 +409,16 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
         static constexpr class_range classes = {};
 
+		decltype(auto) initialize_method_map() noexcept {
+			std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> value;
+			std::apply([&value](auto ...mts) {
+				(value[mts.name].emplace_back(new DMethodWrapper(mts)), ...);
+			}, descriptor::methods);
+			return value;
+		}
+
+		// const auto methods = descriptor::methods;
+		const std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> method_map;
         // using field_model = detail::range_model<typename descriptor::fields, DField, DFieldWrapper>;
         // static constexpr field_model  fields {};
     };

@@ -64,11 +64,6 @@ TEST(mc, static_class) {
     plainClass.visit_methods([&jinxMethods](auto method) constexpr {
         jinxMethods.emplace_back(method.name);
     });
-
-    // auto noArgsNoReturnMethod = plainClass.get_me(noArgsNoReturnPredicate());
-    // static_assert (noArgsNoReturnMethod.num_overloads() == 1);
-    // auto onlyOverload = noArgsNoReturnMethod.get_overload<0>();
-    // static_assert (onlyOverload.num_params() == 0);
 }
 
 TEST(mc, runtime_module) {
@@ -98,9 +93,9 @@ TEST(mc, runtime_namespace) {
 }
 
 TEST(mc, runtime_class) {
-    std::unique_ptr<rosewood::DClass> dynamicJinx(new rosewood::DClassWrapper<rosewood::meta<basic::PlainClass>>);
-    EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
-    EXPECT_TRUE(dynamicJinx->hasMethod("overloadedMethod"));
+    // std::unique_ptr<rosewood::DClass> dynamicJinx(new rosewood::DClassWrapper<rosewood::meta<basic::PlainClass>>);
+    // EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
+    // EXPECT_TRUE(dynamicJinx->hasMethod("overloadedMethod"));
 }
 
 TEST(mc, runtime_searches) {
@@ -111,10 +106,10 @@ TEST(mc, runtime_searches) {
     // auto aMethodSet = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findOverloadSet("doubleInteger");
     // auto aMethod = aMethodSet->getMethods()[0];
 
-    int aMethodRes;
-    int aMethodArg = 12;
-    void *aMethodArgs[] = {&aMethodArg};
-    basic::PlainClass plainClass;
+    // int aMethodRes;
+    // int aMethodArg = 12;
+    // void *aMethodArgs[] = {&aMethodArg};
+    // basic::PlainClass plainClass;
 
     // aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
     // EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
@@ -126,11 +121,12 @@ TEST(mc, string_wrap) {
     TemplateDeclarations module;
     auto tdNamespace = module.findChildNamespace("td");
     auto strWrapper = tdNamespace->findChildClass("WrappedString");
+
     const std::string testString = "Hello World!";
     char *res;
-    // auto cStr = strWrapper->findOverloadSet("c_str")->getMethods()[0];
-    // cStr->call(&testString, &res, nullptr);
-    // EXPECT_EQ(testString, res);
+	auto cStr = strWrapper->findMethod("c_str");
+    cStr->call(&testString, &res, nullptr);
+    EXPECT_EQ(testString, res);
 }
 
 TEST(mc, index) {

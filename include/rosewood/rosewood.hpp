@@ -163,9 +163,27 @@ namespace rosewood {
         }
 
         auto narrowType(void *ptr) const noexcept {
-            return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
+			return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
         }
     };
+
+	template <typename T>
+	struct ReturnTypeHandler {
+		using type_t = T;
+		static auto narrowType(void *ptr) noexcept {
+			if constexpr (std::is_reference<type_t>::value) {
+				// references need to be treated like pointers to be able to cast them around to/from void*
+				return std::forward<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type>(*reinterpret_cast<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type*>(ptr));
+			}
+			else if (std::is_const<type_t>::value) {
+				// without removing constness we won't be able to create a copy from the return value
+				return std::forward<typename std::remove_const<type_t>::type>(*reinterpret_cast<typename std::remove_const<type_t>::type*>(ptr));
+			}
+			else {
+				return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
+			}
+		}
+	};
 
 #ifdef _MSC_VER	// MSVC strips constness when deducing function parameter types. 
 	template <typename ArgType>
@@ -255,6 +273,10 @@ namespace rosewood {
             invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
         }
 
+		constexpr bool is_called(std::string_view nm) const noexcept {
+			return name == nm;
+		}
+
     private:
 
         template <int arg_index, typename ...ConvertedArgs> inline
@@ -278,7 +300,7 @@ namespace rosewood {
                 if constexpr (std::is_void<return_type>::value) {
                     (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
                 } else {
-                    auto& returnSlot = *reinterpret_cast<return_type*>(ret);
+					auto& returnSlot = ReturnTypeHandler<return_type>::narrowType(ret);
                     returnSlot = (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
                 }
             }
@@ -337,43 +359,6 @@ namespace rosewood {
 	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...), std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>;
 
 
-    template<typename Descriptor>
-    struct OverloadSet {
-        using descriptor = Descriptor;
-        constexpr std::string_view get_name() const {
-            return descriptor::name;
-        }
-
-        template <typename visitorT>
-        void for_each_overload(visitorT visitor) const noexcept {
-            using overloads = typename descriptor::overloads;
-            std::apply([visitor](auto ...overload){
-                (visitor(overload), ...);
-            }, overloads());
-        }
-
-        constexpr int num_overloads() const noexcept {
-            using overloads = typename descriptor::overloads;
-            return std::tuple_size<overloads>::value;
-        }
-
-        template<unsigned index>
-        constexpr auto get_overload() const noexcept {
-            using overloads = typename descriptor::overloads;
-            using overload = typename std::tuple_element<index, overloads>::type;
-            return overload();
-        }
-    };
-
-    template<typename Descriptor>
-    struct Operator {};
-
-    template<typename Descriptor>
-    struct ConstructorSet {};
-
-    template<typename Descriptor>
-    struct Field {};
-
     template <typename Type, typename ClassType>
     struct FieldDeclaration {
         using type_t = Type;
@@ -403,7 +388,8 @@ namespace rosewood {
     template<typename Descriptor>
     struct Class {
 
-        using descriptor = Descriptor;
+        using descriptor = Descriptor;		
+
         constexpr bool has_method(std::string_view Name) const noexcept {
             return std::apply([Name] (auto ...meth) {
                 return (... || (meth.name == Name));
@@ -412,8 +398,8 @@ namespace rosewood {
 
         template<typename visitorT>
         constexpr void visit_methods(visitorT visitor) const noexcept {
-            std::apply([visitor](auto ...overloads) {
-                (visitor(overloads), ...);
+            std::apply([visitor](auto ...methods) {
+                (visitor(methods), ...);
             }, Descriptor::methods);
         }
     };
