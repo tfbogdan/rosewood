@@ -166,78 +166,11 @@ namespace mc {
         return where.spawn("", "");
     }
 
-
-    void getFastMethodDispatcher(descriptor_scope &descScope, const clang::CXXMethodDecl* Method, const clang::CXXRecordDecl *Record) {
-        // this should be more elaborate and should consider all method attributes ( const and noexcept come to mind )
-        descScope.putline("static inline void fastcall (");
-
-        scope argList = descScope.inner.spawn();
-        const std::size_t numArgs = Method->param_size();
-        const auto &printingPolicy(Method->getASTContext().getPrintingPolicy());
-        argList.putline("{}void *obj,", Method->isConst() ? "const ": "");
-        argList.putline("[[maybe_unused]] void *retAddr,");
-        argList.putline("[[maybe_unused]] void **args) {{");
-        auto dispatcherBody = argList.spawn();
-        const bool isCtor(Method->getKind() == clang::Decl::Kind::CXXConstructor);
-        const bool isDtor(Method->getKind() == clang::Decl::Kind::CXXDestructor);
-        const auto thisTypeName = clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy);
-        if (isCtor) {
-            dispatcherBody.putline("new (obj) {} ({}", thisTypeName, numArgs > 0 ? "" : ");");
-        } else if (isDtor) {
-            dispatcherBody.putline("{1}{0} &Object = *reinterpret_cast<{1}{0}*>(obj);", thisTypeName, Method->isConst() ? "const ": "");
-            dispatcherBody.putline("Object.~{}();", Record->getNameAsString());
-        } else {
-            dispatcherBody.putline("{1}{0} &Object = *reinterpret_cast<{1}{0}*>(obj);", thisTypeName, Method->isConst() ? "const ": "");
-            const auto returnType = Method->getReturnType().getCanonicalType();
-            const bool isReferenceType = returnType->isReferenceType() || returnType->isRValueReferenceType();
-            const auto castType = returnType->isReferenceType() || returnType->isRValueReferenceType() ? returnType->getPointeeType() : returnType;
-            const std::string retAddrCastExpr(fmt::format("*reinterpret_cast<{}{}*>(retAddr) = {}", castType.getAsString(printingPolicy), isReferenceType ? "*": "", isReferenceType? "&": ""));
-            dispatcherBody.putline("{}Object.{} ({}", returnType->isVoidType() ? "" : retAddrCastExpr, Method->getNameAsString(), numArgs > 0 ? "" : ");");
-        }
-
-        auto callArgList = dispatcherBody.spawn();
-
-        std::size_t index(0);
-        for (const auto arg: Method->parameters()) {
-            const auto argType = arg->getType();
-            const bool isRValue = argType->isRValueReferenceType();
-            const auto castType = argType->isReferenceType() || argType->isRValueReferenceType() ? argType->getPointeeType() : argType;
-            const std::string paramCastExpr(fmt::format("*reinterpret_cast<{}*>(args[{}])", castType.getCanonicalType().getAsString(printingPolicy), index));
-            callArgList.putline("{}{}{}{}", isRValue ? "std::move(" : "", paramCastExpr, isRValue ? ")": "" ,index < (numArgs - 1) ? ",": "");
-            ++index;
-        }
-        if (numArgs > 0) {
-            dispatcherBody.putline(");");
-        }
-        descScope.putline("}}");
-    }
-
     void ReflectionDataGenerator::exportType(const std::string &exportAs, clang::QualType type, descriptor_scope &where) {
         const auto canonicalTypeName = type.getCanonicalType().getAsString(printingPolicy);
         const auto plainTypeName = type.getAsString(printingPolicy);
         const auto atomicTypeName = getUnitType(type).getCanonicalType().getAsString(printingPolicy);
         where.putline("static constexpr rosewood::Type<{0}> {3}{{\"{1}\", \"{0}\", \"{2}\"}};", canonicalTypeName, plainTypeName, atomicTypeName, exportAs);
-    }
-
-    descriptor_scope ReflectionDataGenerator::exportCxxMethod(const std::string &name, const clang::CXXRecordDecl *record, const clang::CXXMethodDecl* method, descriptor_scope &outerScope) {
-        auto methodScope = outerScope.spawn(name, "rosewood::Method");
-        getFastMethodDispatcher(methodScope, method, record);
-
-        exportType("return_type", method->getReturnType(), methodScope);
-        methodScope.putline("static constexpr bool is_const = {};", method->isConst());
-
-        std::vector<std::string> parameters;
-        for (const auto param: method->parameters()) {
-            auto parmName = (param->getDeclName().isEmpty() || param->isImplicit() || method->isImplicit()) ? fmt::format("implicit_arg_{}", parameters.size()) : param->getNameAsString();
-            auto paramScope = methodScope.spawn(parmName, "rosewood::Parameter");
-            exportType("type", param->getType(), paramScope);
-            parameters.emplace_back(fmt::format("meta_{}", parmName));
-        }
-        wrap_range_in_tuple("parameters", methodScope.inner, parameters);
-        //
-
-        //
-        return methodScope;
     }
 
     bool isNoExcept(const clang::CXXMethodDecl *method) {
@@ -374,10 +307,6 @@ namespace mc {
         outerScope.putline("}};");
     }
 
-    descriptor_scope ReflectionDataGenerator::exportCxxDestructor(const clang::CXXDestructorDecl *Dtor, const clang::CXXRecordDecl *record, descriptor_scope &outerScope) {
-        return exportCxxMethod("destructor", record, Dtor, outerScope);
-    }
-
     void ReflectionDataGenerator::exportFields(const std::vector<const clang::FieldDecl*> &fields, descriptor_scope &outerScope) {
         outerScope.put("static constexpr std::tuple fields {{");
         if (fields.empty()) {
@@ -423,6 +352,7 @@ namespace mc {
 
 
     descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
+
         auto ownScope = where.spawn(name, "rosewood::Class");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
         ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
@@ -431,8 +361,6 @@ namespace mc {
             {"enums", {}}
         };
 
-        // std::map<llvm::StringRef, std::vector<const clang::FunctionDecl*>> function_groups;
-        // std::map<std::string, std::vector<const clang::FunctionDecl*>> static_operator_groups;
         std::vector<const clang::CXXConstructorDecl*> constructors;
         std::vector<const clang::CXXConversionDecl*> conversions;
         std::vector<const clang::FieldDecl*> fields;
@@ -493,14 +421,22 @@ namespace mc {
             }
         }
 
+        ownScope.putline("using bases_t = std::tuple < ");
+        int baseIndex(0);
+        for (const auto &base: Record->bases()) {
+            if (base.getAccessSpecifier() == clang::AccessSpecifier::AS_public) {
+                ownScope.putline("{} {}", baseIndex == 0 ? " ": ",", base.getType().getAsString(printingPolicy));
+            }
+            ++baseIndex;
+        }
+        ownScope.putline(">;");
+
         exportConstructors(constructors, Record, ownScope);
-        //for(const auto &[grpName, grp]: method_groups) {
-        //    exportCxxMethodGroup(grpName, Record, grp, ownScope);
-        //}
         exportMethods(Record, exportedMethods, ownScope);
         exportFields(fields, ownScope);
+
         if (destructor != nullptr) {
-            exportCxxDestructor(destructor, Record, ownScope);
+            // exportCxxDestructor(destructor, Record, ownScope);
         }
 
         for(const auto cls: classes) {

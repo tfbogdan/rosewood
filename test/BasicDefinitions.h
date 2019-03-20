@@ -49,4 +49,9 @@ private:
     float privateFloatMember = 3;
 };
 
+class PlainClassExtension : public PlainClass {
+public:
+    using PlainClass::PlainClass;
+};
+
 }

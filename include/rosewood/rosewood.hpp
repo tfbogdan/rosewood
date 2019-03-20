@@ -107,40 +107,6 @@ namespace rosewood {
         std::string_view name;
     };
 
-    template<typename Descriptor>
-    struct Parameter {
-        using descriptor = Descriptor;
-
-        constexpr std::string_view get_name() const {
-            return descriptor::name;
-        }
-    };
-
-    template<typename Descriptor>
-    struct Method {
-        using descriptor = Descriptor;
-
-        template <typename visitorT>
-        void for_each_parameter(visitorT visitor) const {
-            using param_tuple = typename descriptor::parameters;
-            std::apply([visitor] (auto ...params){
-                (visitor(params), ...);
-            }, param_tuple());
-        }
-
-        constexpr int num_params() const noexcept {
-            using parameters = typename descriptor::parameters;
-            return std::tuple_size<parameters>::value;
-        }
-
-        template<unsigned index>
-        constexpr auto get_param() const noexcept {
-            using parameters = typename descriptor::parameters;
-            using param = typename std::tuple_element<index, parameters>::type;
-            return param();
-        }
-    };
-
     template <typename ArgType>
     struct FunctionParameter {
         using type_t = ArgType;
@@ -174,23 +140,13 @@ namespace rosewood {
     struct ReturnTypeHandler {
         using type_t = T;
         static auto narrowType(void *ptr) noexcept {
-            // if constexpr (std::is_reference<type_t>::value) {
-                // references need to be treated like pointers to be able to cast them around to/from void*
-                // return std::forward<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type>(*reinterpret_cast<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type*>(ptr));
-            // }
-            // else if (std::is_const<type_t>::value) {
-                // without removing constness we won't be able to create a copy from the return value
-                // return std::forward<typename std::remove_const<type_t>::type>(*reinterpret_cast<typename std::remove_const<type_t>::type*>(ptr));
-            // }
-            // else {
-                return reinterpret_cast<
-                        typename std::remove_const<
-                            typename std::remove_reference<
-                                typename std::remove_const<type_t>::type
-                            >::type
-                        >::type*
-                     >(ptr);
-            // }
+            return reinterpret_cast<
+                    typename std::remove_const<
+                        typename std::remove_reference<
+                            typename std::remove_const<type_t>::type
+                        >::type
+                    >::type*
+                 >(ptr);
         }
     };
 
@@ -263,23 +219,23 @@ namespace rosewood {
 
 
         inline void invoke(void* object, void* ret, void **pArgs) const {
-            invoke_impl<0>(object, ret, pArgs);
+            invoke_impl (object, ret, pArgs);
         }
 
         inline void invoke(const void* object, void* ret, void **pArgs) const {
             static_assert (is_const, "");
-            invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
+            invoke_impl (const_cast<void*>(object), ret, pArgs);
         }
 
         inline void invoke_noexcept(void* object, void* ret, void **pArgs) const noexcept {
             static_assert (is_noexcept, "");
-            invoke_impl<0>(object, ret, pArgs);
+            invoke_impl (object, ret, pArgs);
         }
 
         inline void invoke_noexcept(const void* object, void* ret, void **pArgs) const noexcept {
             static_assert (is_const, "");
             static_assert (is_noexcept, "");
-            invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
+            invoke_impl (const_cast<void*>(object), ret, pArgs);
         }
 
         constexpr bool is_called(std::string_view nm) const noexcept {
@@ -288,35 +244,18 @@ namespace rosewood {
 
     private:
 
-        template <int arg_index, typename ...ConvertedArgs> inline
-        void invoke_impl(void* object, void* ret, void** pArgs, ConvertedArgs ...convertedArgs) const {
-            /*if constexpr(arg_index < num_args) {
-                // pop an argument from the head of the tuple
-                // convert it to it's actual type
-                // and call recursively for further argument decomposition
-                auto& arg = std::get<arg_index>(args);
-                using arg_t = typename std::tuple_element<arg_index, decltype(args)>::type;
-                invoke_impl<arg_index+1>(
-                            object,
-                            ret,
-                            pArgs +  1,
-                            std::forward<ConvertedArgs>(convertedArgs)...,
-                            std::forward<arg_t>(*arg.narrowType(pArgs[0])));
-            } else {*/
-                // all arguments have already been decomposed.
-                using object_type = typename type_decompositor::object_type;
-                auto obj = reinterpret_cast<object_type*>(object);
+        inline void invoke_impl(void* object, void* ret, void** pArgs) const {
+            using object_type = typename type_decompositor::object_type;
+            auto obj = reinterpret_cast<object_type*>(object);
 
-                std::apply([this, pArgs, ret, obj](auto& ...arg){
-                    if constexpr (std::is_void<return_type>::value) {
-                        (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
-                    } else {
-                        *ReturnTypeHandler<return_type>::narrowType(ret)
-                                = (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
-                    }
-                }, args);
-
-            // }
+            std::apply([this, pArgs, ret, obj](auto& ...arg){
+                if constexpr (std::is_void<return_type>::value) {
+                    (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
+                } else {
+                    *ReturnTypeHandler<return_type>::narrowType(ret)
+                            = (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
+                }
+            }, args);
         }
     };
 
@@ -333,32 +272,20 @@ namespace rosewood {
             :arguments(args) {}
 
         inline void invoke(void* object, void **pArgs) const {
-            invoke_impl<0>(object, pArgs);
+            invoke_impl (object, pArgs);
         }
 
         inline void invoke_noexcept(void* object, void **pArgs) const noexcept {
             static_assert (is_noexcept, "");
-            invoke_impl<0>(object, pArgs);
+            invoke_impl (object, pArgs);
         }
 
     private:
 
-        template <int arg_index, typename ...ConvertedArgs> inline
-        void invoke_impl(void* addr, void** pArgs, ConvertedArgs ...convertedArgs) const {
-            if constexpr(arg_index < num_args) {
-                // pop an argument from the head of the tuple
-                // convert it to it's actual type
-                // and call recursively for further argument decomposition
-                auto& arg = std::get<arg_index>(arguments);
-                invoke_impl<arg_index+1>(
-                            addr,
-                            pArgs +  1,
-                            std::forward<ConvertedArgs>(convertedArgs)...,
-                            arg.narrowType(pArgs[0]));
-            } else {
-                // all arguments have already been decomposed.
-                new (addr) class_type(std::forward<ConvertedArgs>(convertedArgs)...);
-            }
+        void invoke_impl(void* addr, void** pArgs) const {
+            std::apply([this, pArgs, addr] (auto& ...arg) {
+                new (addr) ClassType(arg.narrowType(pArgs[arg.arg_pos]) ...);
+            }, arguments);
         }
     };
 
@@ -395,18 +322,6 @@ namespace rosewood {
         }
 
     };
-
-    template <typename tupleT, typename pred>
-    constexpr auto get_by_name(tupleT, pred p) noexcept {
-        static_assert (std::tuple_size<tupleT>::value > 0, "no element found with ::name == pred::pred");
-        using headT = typename std::tuple_element<0, tupleT>::type;
-        if constexpr(pred::pred == headT::name) {
-            return headT();
-        } else {
-            using tailT = typename tuple_seeker<tupleT>::tail;
-            return get_by_name<typename tuple_seeker<tupleT>::tail>(tailT(), p);
-        }
-    }
 
     template<typename Descriptor>
     struct Class {
