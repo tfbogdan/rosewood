@@ -92,28 +92,28 @@ TEST(mc, runtime_namespace) {
     EXPECT_EQ(basicDefs.findChildNamespace("basic"), dBasic);
 }
 
-TEST(mc, runtime_class) {
-    // std::unique_ptr<rosewood::DClass> dynamicJinx(new rosewood::DClassWrapper<rosewood::meta<basic::PlainClass>>);
-    // EXPECT_FALSE(dynamicJinx->hasMethod("no such method"));
-    // EXPECT_TRUE(dynamicJinx->hasMethod("overloadedMethod"));
-}
-
 TEST(mc, runtime_searches) {
     using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
     BasicDefinitions basicDefs;
 
-    // EXPECT_NO_THROW(basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findOverloadSet("doubleInteger"));
-    // auto aMethodSet = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findOverloadSet("doubleInteger");
+    EXPECT_NO_THROW(basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger"));
+    auto aMethod = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger");
+    auto intField = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findField("intField");
+
     // auto aMethod = aMethodSet->getMethods()[0];
 
-    // int aMethodRes;
-    // int aMethodArg = 12;
-    // void *aMethodArgs[] = {&aMethodArg};
-    // basic::PlainClass plainClass;
+    int aMethodRes;
+    int aMethodArg = 12;
+    void *aMethodArgs[] = {&aMethodArg};
+    basic::PlainClass plainClass;
 
-    // aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
-    // EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
-    // EXPECT_NO_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs));
+    int testValue = 1337;
+    intField->assign_copy(&plainClass, &testValue);
+    aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
+    EXPECT_EQ(plainClass.intField, testValue);
+
+    EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
+    EXPECT_NO_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs));
 }
 
 TEST(mc, string_wrap) {
@@ -124,7 +124,7 @@ TEST(mc, string_wrap) {
 
     const std::string testString = "Hello World!";
     char *res;
-	auto cStr = strWrapper->findMethod("c_str");
+    auto cStr = strWrapper->findMethod("c_str");
     cStr->call(&testString, &res, nullptr);
     EXPECT_EQ(testString, res);
 }
@@ -142,7 +142,7 @@ TEST(mc, index) {
            rosewood::MethodDeclaration(
               &basic::PlainClass::doubleInteger,
               "doubleInteger",
-              std::tuple(rosewood::FunctionParameter<int>("namedParam", false)));
+              std::tuple(rosewood::FunctionParameter<int>("namedParam", false, 0)));
     EXPECT_TRUE(method.isConst());
     EXPECT_TRUE(otherMethod.isConst());
     const basic::PlainClass plainClass;

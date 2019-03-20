@@ -20,21 +20,21 @@ namespace rosewood {
 
     template <template<typename> typename wrapping_type, typename ...WrappedTupleTypes, typename Head, typename ...UnwrappedTypes>
     struct tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes...>, std::tuple<Head, UnwrappedTypes...>> {
-		using type = typename tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes..., wrapping_type<Head>>, std::tuple<UnwrappedTypes...>>::type;
+        using type = typename tuple_elements_wrapper<wrapping_type, std::tuple<WrappedTupleTypes..., wrapping_type<Head>>, std::tuple<UnwrappedTypes...>>::type;
     };
 
-	template <template<typename> typename wrapping_type, typename ...Types>
-	struct arguments_wrapper;
+    template <template<typename> typename wrapping_type, typename ...Types>
+    struct arguments_wrapper;
 
-	template <template<typename> typename wrapping_type, typename ...TupleTypes>
-	struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>> {
-		using type = std::tuple<TupleTypes...>;
-	};
+    template <template<typename> typename wrapping_type, typename ...TupleTypes>
+    struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>> {
+        using type = std::tuple<TupleTypes...>;
+    };
 
-	template <template<typename> typename wrapping_type, typename Head, typename ...Types, typename ...TupleTypes>
-	struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>, Head, Types...> {
-		using type = typename arguments_wrapper<wrapping_type, std::tuple<TupleTypes..., wrapping_type<Head>>, Types...>::type;
-	};
+    template <template<typename> typename wrapping_type, typename Head, typename ...Types, typename ...TupleTypes>
+    struct arguments_wrapper<wrapping_type, std::tuple<TupleTypes...>, Head, Types...> {
+        using type = typename arguments_wrapper<wrapping_type, std::tuple<TupleTypes..., wrapping_type<Head>>, Types...>::type;
+    };
 
 
 
@@ -145,9 +145,10 @@ namespace rosewood {
     struct FunctionParameter {
         using type_t = ArgType;
 
-        constexpr FunctionParameter(std::string_view argName, bool hasDefaultValue) noexcept
-            :name(argName),
-              isDefaulted(hasDefaultValue) {}
+        constexpr FunctionParameter(std::string_view argName, bool hasDefaultValue, int pos) noexcept
+            : name(argName),
+              isDefaulted(hasDefaultValue),
+              arg_pos(pos) {}
 
         constexpr FunctionParameter() noexcept = default;
         constexpr FunctionParameter(const FunctionParameter&) noexcept = default;
@@ -155,6 +156,7 @@ namespace rosewood {
 
         std::string_view name = "";
         bool isDefaulted = false;
+        int arg_pos = 0;
 
         // Is a reference the correct type to work with here?
         // certainly needs a bit of looking into
@@ -162,38 +164,45 @@ namespace rosewood {
             return static_cast<void*>(&t);
         }
 
-        auto narrowType(void *ptr) const noexcept {
-			return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
+        decltype(auto) narrowType(void *ptr) const noexcept {
+            return static_cast<type_t>
+                    (*reinterpret_cast<typename std::remove_reference<type_t>::type*>(ptr));
         }
     };
 
-	template <typename T>
-	struct ReturnTypeHandler {
-		using type_t = T;
-		static auto narrowType(void *ptr) noexcept {
-			if constexpr (std::is_reference<type_t>::value) {
-				// references need to be treated like pointers to be able to cast them around to/from void*
-				return std::forward<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type>(*reinterpret_cast<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type*>(ptr));
-			}
-			else if (std::is_const<type_t>::value) {
-				// without removing constness we won't be able to create a copy from the return value
-				return std::forward<typename std::remove_const<type_t>::type>(*reinterpret_cast<typename std::remove_const<type_t>::type*>(ptr));
-			}
-			else {
-				return std::forward<type_t>(*reinterpret_cast<type_t*>(ptr));
-			}
-		}
-	};
+    template <typename T>
+    struct ReturnTypeHandler {
+        using type_t = T;
+        static auto narrowType(void *ptr) noexcept {
+            // if constexpr (std::is_reference<type_t>::value) {
+                // references need to be treated like pointers to be able to cast them around to/from void*
+                // return std::forward<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type>(*reinterpret_cast<typename std::add_pointer<typename std::remove_reference<type_t>::type>::type*>(ptr));
+            // }
+            // else if (std::is_const<type_t>::value) {
+                // without removing constness we won't be able to create a copy from the return value
+                // return std::forward<typename std::remove_const<type_t>::type>(*reinterpret_cast<typename std::remove_const<type_t>::type*>(ptr));
+            // }
+            // else {
+                return reinterpret_cast<
+                        typename std::remove_const<
+                            typename std::remove_reference<
+                                typename std::remove_const<type_t>::type
+                            >::type
+                        >::type*
+                     >(ptr);
+            // }
+        }
+    };
 
-#ifdef _MSC_VER	// MSVC strips constness when deducing function parameter types. 
-	template <typename ArgType>
-	struct FunctionParameter<const ArgType> : public FunctionParameter<ArgType> {
-		using impl_t = FunctionParameter<ArgType>;
-		using type_t = FunctionParameter<const ArgType>;
+#ifdef _MSC_VER	// MSVC strips constness when deducing function parameter types.
+    template <typename ArgType>
+    struct FunctionParameter<const ArgType> : public FunctionParameter<ArgType> {
+        using impl_t = FunctionParameter<ArgType>;
+        using type_t = FunctionParameter<const ArgType>;
 
-		constexpr type_t(std::string_view argName, bool hasDefaultValue) noexcept
-			:impl_t(argName, hasDefaultValue) {}
-	};
+        constexpr type_t(std::string_view argName, bool hasDefaultValue) noexcept
+            :impl_t(argName, hasDefaultValue) {}
+    };
 
 #endif // _MSC_VER
 
@@ -273,37 +282,41 @@ namespace rosewood {
             invoke_impl<0>(const_cast<void*>(object), ret, pArgs);
         }
 
-		constexpr bool is_called(std::string_view nm) const noexcept {
-			return name == nm;
-		}
+        constexpr bool is_called(std::string_view nm) const noexcept {
+            return name == nm;
+        }
 
     private:
 
         template <int arg_index, typename ...ConvertedArgs> inline
         void invoke_impl(void* object, void* ret, void** pArgs, ConvertedArgs ...convertedArgs) const {
-            if constexpr(arg_index < num_args) {
+            /*if constexpr(arg_index < num_args) {
                 // pop an argument from the head of the tuple
                 // convert it to it's actual type
                 // and call recursively for further argument decomposition
                 auto& arg = std::get<arg_index>(args);
+                using arg_t = typename std::tuple_element<arg_index, decltype(args)>::type;
                 invoke_impl<arg_index+1>(
                             object,
                             ret,
                             pArgs +  1,
                             std::forward<ConvertedArgs>(convertedArgs)...,
-                            arg.narrowType(pArgs[0]));
-            } else {
+                            std::forward<arg_t>(*arg.narrowType(pArgs[0])));
+            } else {*/
                 // all arguments have already been decomposed.
                 using object_type = typename type_decompositor::object_type;
-                object_type &obj = *reinterpret_cast<object_type*>(object);
+                auto obj = reinterpret_cast<object_type*>(object);
 
-                if constexpr (std::is_void<return_type>::value) {
-                    (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
-                } else {
-					auto& returnSlot = ReturnTypeHandler<return_type>::narrowType(ret);
-                    returnSlot = (obj.*method_ptr)(std::forward<ConvertedArgs>(convertedArgs)...);
-                }
-            }
+                std::apply([this, pArgs, ret, obj](auto& ...arg){
+                    if constexpr (std::is_void<return_type>::value) {
+                        (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
+                    } else {
+                        *ReturnTypeHandler<return_type>::narrowType(ret)
+                                = (obj->*method_ptr)(arg.narrowType(pArgs[arg.arg_pos]) ...);
+                    }
+                }, args);
+
+            // }
         }
     };
 
@@ -349,14 +362,14 @@ namespace rosewood {
         }
     };
 
-	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
     MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>::arg_types &&) -> MethodDeclaration<ClassType, ReturnType, true, true, ArgTypes...>;
-	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>;
-	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes... >;
-	template<typename ClassType, typename ReturnType, typename ...ArgTypes>
-	MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...), std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>;
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) noexcept, std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, true, ArgTypes...>;
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...) const, std::string_view, typename MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, true, false, ArgTypes... >;
+    template<typename ClassType, typename ReturnType, typename ...ArgTypes>
+    MethodDeclaration(ReturnType(ClassType::*)(ArgTypes...), std::string_view, typename MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>::arg_types&&)->MethodDeclaration<ClassType, ReturnType, false, false, ArgTypes...>;
 
 
     template <typename Type, typename ClassType>
@@ -370,6 +383,16 @@ namespace rosewood {
 
         std::string_view name;
         address_type address;
+
+        void assign_copy(void *obj, void *from) const {
+            auto *object = reinterpret_cast<ClassType*>(obj);
+            (object->*address) = *reinterpret_cast<type_t*>(from);
+        }
+
+        void assign_move(void *obj, void *from) const {
+            auto *object = reinterpret_cast<ClassType*>(obj);
+            (object->*address) = std::move(*reinterpret_cast<type_t*>(from));
+        }
 
     };
 
@@ -388,7 +411,7 @@ namespace rosewood {
     template<typename Descriptor>
     struct Class {
 
-        using descriptor = Descriptor;		
+        using descriptor = Descriptor;
 
         constexpr bool has_method(std::string_view Name) const noexcept {
             return std::apply([Name] (auto ...meth) {

@@ -36,9 +36,10 @@ public:
     void constNoExceptFunction() const noexcept;
     void overloadedMethod(int i);
 
-	static int fct() noexcept;
+    static int fct() noexcept;
 
     float floatField = .2f;
+    int intField = 23;
 
     enum innerEnum{
         firstEnum, secondOne, third = -3

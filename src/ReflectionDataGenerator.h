@@ -18,6 +18,7 @@ inline std::ostream& operator<< (std::ostream& os, const llvm::StringRef& v) {
     for (auto c: v) {
         os << c;
     }
+    return os;
 }
 
 extern llvm::cl::opt<std::string> mcModuleName;

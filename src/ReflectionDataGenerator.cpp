@@ -259,8 +259,8 @@ namespace mc {
 
     std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
         // build the argument list
-		llvm::SmallVector<char, 1024> buff;
-		llvm::raw_svector_ostream sstream(buff);
+        llvm::SmallVector<char, 1024> buff;
+        llvm::raw_svector_ostream sstream(buff);
         auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
         bool noExcept = isNoExcept(method);
         sstream << method->getReturnType().getCanonicalType().getAsString(printingPolicy);
@@ -305,10 +305,11 @@ namespace mc {
                 outerScope.putline("std::tuple{{");
                 ++outerScope.inner;
                 for (const auto& param: Method->parameters()) {
-                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}){}",
+                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}, {}){}",
                                                    param->getType().getCanonicalType().getAsString(printingPolicy),
                                                    param->getNameAsString(),
                                                    param->hasDefaultArg(),
+                                                   paramIdx,
                                                    paramIdx < (Method->parameters().size() - 1) ? ",": ""
                                                    ));
                     ++paramIdx;
@@ -354,10 +355,11 @@ namespace mc {
                 outerScope.putline("std::tuple{{");
                 ++outerScope.inner;
                 for (const auto& param: ctor->parameters()) {
-                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}){}",
+                    outerScope.putline(fmt::format("rosewood::FunctionParameter<{}>(\"{}\", {}, {}){}",
                                                    param->getType().getCanonicalType().getAsString(printingPolicy),
                                                    param->getNameAsString(),
                                                    param->hasDefaultArg(),
+                                                   paramIdx,
                                                    paramIdx < (ctor->parameters().size() - 1) ? ",": ""
                                                    ));
                     ++paramIdx;
@@ -450,9 +452,9 @@ namespace mc {
             case clang::Decl::Kind::CXXMethod: {
                 auto method = static_cast<const clang::CXXMethodDecl*>(decl);
                 if (!areMethodArgumentsPubliclyUsable(method)) continue;
-				if (!method->isStatic() && !method->isDeleted()) {
-					exportedMethods.push_back(method);
-				}
+                if (!method->isStatic() && !method->isDeleted()) {
+                    exportedMethods.push_back(method);
+                }
             } break;
             case clang::Decl::Kind::CXXConstructor: {
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);

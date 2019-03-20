@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <stdexcept>
+#include <memory>
 
 namespace rosewood {
 
@@ -273,9 +274,9 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DMethodWrapper : public DMethod {
     public:
 
-		DMethodWrapper(const Descriptor& desc)
-			:descriptor(desc) {
-		}
+        DMethodWrapper(const Descriptor& desc)
+            :descriptor(desc) {
+        }
 
         inline virtual std::string_view getName() const noexcept final {
             return descriptor.name;
@@ -283,18 +284,18 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
 
         virtual void call(const void *object, void *retValAddr, void **args) const final {
             if constexpr (Descriptor::is_const) {
-				return descriptor.invoke(object, retValAddr, args);
+                return descriptor.invoke(object, retValAddr, args);
             } else {
                 throw const_corectness_error("non const method called on const object");
             }
         }
 
         inline virtual void call(void *object, void *retValAddr, void **args) const final {
-			descriptor.invoke(object, retValAddr, args);
+            descriptor.invoke(object, retValAddr, args);
         }
 
         inline virtual const DType *getReturnType() const noexcept final {
-			return nullptr; //  &returntype;
+            return nullptr; //  &returntype;
         }
 
     private:
@@ -304,7 +305,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         // using return_type = DTypeWrapper<Descriptor::return_type>;
         // static const return_type returntype;
 
-		Descriptor descriptor;
+        Descriptor descriptor;
     };
 
     // template <typename Descriptor>
@@ -336,27 +337,42 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DField : public DMetaDecl, public DTypedDeclaration {
     public:
         virtual ~DField() = 0;
+        virtual void assign_copy(void* o, void* a) const = 0;
+        virtual void assign_move(void* o, void* a) const = 0;
     };
 
     template <typename Descriptor>
     class DFieldWrapper : public DField {
     public:
         inline virtual ~DFieldWrapper() = default;
+
+        DFieldWrapper(Descriptor& desc)
+            :descriptor(desc) {}
+
         inline virtual std::string_view getName() const noexcept final {
-            return Descriptor::name;
+            return descriptor.name;
         }
 
         inline virtual const DType *getType() const noexcept final {
-            return &type;
+            return nullptr; // &type;
+        }
+
+        inline virtual void assign_copy(void* o, void* a) const final {
+            descriptor.assign_copy(o, a);
+        }
+
+        inline virtual void assign_move(void* o, void* a) const final {
+            descriptor.assign_move(o, a);
         }
 
     private:
-        using type_information = DTypeWrapper<decltype(Descriptor::type)>;
-        static const type_information type;
+        // using type_information = DTypeWrapper<decltype(Descriptor::type)>;
+        // static const type_information type;
+        Descriptor descriptor;
     };
 
-    template <typename Descriptor>
-    const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type(Descriptor::type);
+    // template <typename Descriptor>
+    // const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type(Descriptor::type);
 
     class DClass : public DMetaDecl, public DClassContainer, public DEnumContainer {
     public:
@@ -372,8 +388,9 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     public:
         using descriptor = MetaClass;
 
-		DClassWrapper() 
-			: method_map(initialize_method_map()) {}
+        DClassWrapper()
+            : method_map(initialize_method_map()),
+              field_map(initialize_field_map()) {}
 
         inline ~DClassWrapper() = default;
 
@@ -382,9 +399,12 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline const DMethod *findMethod(std::string_view name) const noexcept final {
-			// bool found;
+            auto res = method_map.find(name);
+            if (res != method_map.end()) {
+                return res->second[0].get();
+            }
 
-			return nullptr;
+            return nullptr;
         }
 
         inline const DClass *findChildClass(std::string_view name) const noexcept(false) final {
@@ -396,7 +416,12 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline const DField *findField(std::string_view name) const noexcept(false) final {
-            return nullptr; // fields.element_map.at(name);
+            auto res = field_map.find(name);
+            if (res != field_map.end()) {
+                return res->second.get();
+            }
+
+            return nullptr;
         }
 
     private:
@@ -409,16 +434,26 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
         static constexpr class_range classes = {};
 
-		decltype(auto) initialize_method_map() noexcept {
-			std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> value;
-			std::apply([&value](auto ...mts) {
-				(value[mts.name].emplace_back(new DMethodWrapper(mts)), ...);
-			}, descriptor::methods);
-			return value;
-		}
+        decltype(auto) initialize_method_map() noexcept {
+            std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> value;
+            std::apply([&value](auto ...mts) {
+                (value[mts.name].emplace_back(new DMethodWrapper(mts)), ...);
+            }, descriptor::methods);
+            return value;
+        }
 
-		// const auto methods = descriptor::methods;
-		const std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> method_map;
+        decltype(auto) initialize_field_map() noexcept {
+            std::unordered_map<std::string_view, std::unique_ptr<const DField>> value;
+            std::apply([&value](auto ...fields) {
+                ((value[fields.name].reset(new DFieldWrapper(fields))), ...);
+            }, descriptor::fields);
+            return value;
+        }
+
+        // const auto methods = descriptor::methods;
+        const std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> method_map;
+        const std::unordered_map<std::string_view, std::unique_ptr<const DField>> field_map;
+
         // using field_model = detail::range_model<typename descriptor::fields, DField, DFieldWrapper>;
         // static constexpr field_model  fields {};
     };
