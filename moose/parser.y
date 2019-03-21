@@ -45,6 +45,8 @@
 
 %locations
 
+%type <std::string>             literal
+
 %%
 script:
         block END
@@ -58,6 +60,7 @@ block:
 expression:
         assignment
     |   function_call
+    |   literal
     ;
 
 assignment:
@@ -86,8 +89,16 @@ parameter:
             std::cerr << "Pushing expression arg\n";
         }
 
-    |   STRING {
-            std::cerr << "Pushing string arg " << $1 << "\n";
+    |   literal {
+            std::cerr << "Pushing literal arg \"" << $1 << "\"\n";
+        }
+    ;
+
+
+literal:
+        STRING  {
+            $$ = $1;
+            std::cerr << "Pushing string literal \"" << $1 << "\"\n";
         }
     ;
 %%

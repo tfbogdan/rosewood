@@ -180,6 +180,8 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DEnumWrapper : public DEnum {
         using descriptor = MetaEnum;
     public:
+        DEnumWrapper(const MetaEnum &me) {}
+
         inline virtual ~DEnumWrapper() = default;
 
         inline virtual std::string_view getName() const noexcept {
@@ -388,7 +390,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     public:
         using descriptor = MetaClass;
 
-        DClassWrapper()
+        DClassWrapper(MetaClass mc)
             : method_map(initialize_method_map()),
               field_map(initialize_field_map()) {}
 
@@ -408,11 +410,11 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline const DClass *findChildClass(std::string_view name) const noexcept(false) final {
-            return classes.element_map.at(name);
+            return nullptr; // classes.element_map.at(name);
         }
 
         inline const DEnum *findChildEnum(std::string_view name) const noexcept(false) final {
-            return enums.element_map.at(name);
+            return nullptr; // enums.element_map.at(name);
         }
 
         inline const DField *findField(std::string_view name) const noexcept(false) final {
@@ -425,14 +427,14 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
     private:
-        using enum_range = detail::range_model<typename MetaClass::enums, DEnum, DEnumWrapper>;
-        static constexpr enum_range enums = {};
+        // using enum_range = detail::range_model<typename MetaClass::enums, DEnum, DEnumWrapper>;
+        // static constexpr enum_range enums = {};
 
-        template<typename T>
-        using disambiguator = DClassWrapper<T>;
+        // template<typename T>
+        // using disambiguator = DClassWrapper<T>;
 
-        using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
-        static constexpr class_range classes = {};
+        // using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
+        // static constexpr class_range classes = {};
 
         decltype(auto) initialize_method_map() noexcept {
             std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> value;
@@ -464,6 +466,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         using descriptor = MetaNamespace;
     public:
 
+        DNamespaceWrapper(const MetaNamespace &mn) {
+            initClasses();
+        }
+
         inline virtual ~DNamespaceWrapper() = default;
 
         inline virtual std::string_view getName() const noexcept {
@@ -471,46 +477,56 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
         inline virtual const std::vector<const DNamespace*> getNamespaces() const noexcept override final {
-            return std::vector<const DNamespace*>(namespaces.base_array.begin(), namespaces.base_array.end());
+            return std::vector<const DNamespace*>();//namespaces.base_array.begin(), namespaces.base_array.end());
         }
 
         inline virtual const std::vector<const DClass*> getClasses() const noexcept override final {
-            return std::vector<const DClass*>(
+            return std::vector<const DClass*>(); /*
                         classes.base_array.begin(),
                         classes.base_array.end()
-            );
+            );*/
         }
 
         inline virtual const std::vector<const DEnum*> getEnums() const noexcept override final {
-            return std::vector<const DEnum*>(
+            return std::vector<const DEnum*>(); /*
                         enums.base_array.begin(),
                         enums.base_array.end()
-            );
+            );*/
         }
 
         inline virtual const DNamespace *findChildNamespace(std::string_view name) const noexcept(false) override final {
-            return namespaces.element_map.at(name);
+            return nullptr;// namespaces.element_map.at(name);
         }
 
         inline virtual const DClass *findChildClass(std::string_view name) const noexcept(false) override final {
-            return classes.element_map.at(name);
+            return nullptr;// classes.element_map.at(name);
         }
 
         inline virtual const DEnum *findChildEnum(std::string_view name) const noexcept(false) override final {
-            return enums.element_map.at(name);
+            return nullptr; // enums.element_map.at(name);
         }
 
     protected:
-        using enum_range = detail::range_model<typename MetaNamespace::enums, DEnum, DEnumWrapper>;
-        static constexpr enum_range enums = {};
+        // using enum_range = detail::range_model<typename MetaNamespace::enums, DEnum, DEnumWrapper>;
+        // static constexpr enum_range enums = {};
 
-        using class_range = detail::range_model<typename MetaNamespace::classes, DClass, DClassWrapper>;
-        static constexpr class_range classes = {};
+        // using class_range = detail::range_model<typename MetaNamespace::classes, DClass, DClassWrapper>;
+        // static constexpr class_range classes = {};
 
-        template <typename T>
-        using disambiguator = DNamespaceWrapper<T>;
-        using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, disambiguator>;
-        static constexpr namespaces_model namespaces {};
+        void initClasses() {
+            using classes_tuple = typename MetaNamespace::classes;
+            classes_tuple ctup;
+            std::apply([this](auto &&...clses) {
+                ((classes[clses.name].reset(new DClassWrapper(clses))), ...);
+            }, ctup);
+        }
+
+        std::unordered_map<std::string_view, std::unique_ptr<const DClass>> classes;
+
+        // template <typename T>
+        // using disambiguator = DNamespaceWrapper<T>;
+        // using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, disambiguator>;
+        // static constexpr namespaces_model namespaces {};
     };
 
 }

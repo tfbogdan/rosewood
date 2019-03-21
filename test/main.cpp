@@ -67,8 +67,8 @@ TEST(mc, static_class) {
 }
 
 TEST(mc, runtime_module) {
-    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
-    BasicDefinitions basicDefs;
+    constexpr rosewood::meta_BasicDefinitions sbd;
+    rosewood::DNamespaceWrapper basicDefs(sbd);
 
     EXPECT_EQ(basicDefs.getNamespaces()[0]->getName(), "basic");
     EXPECT_EQ(basicDefs.getClasses().size(), 0);
@@ -82,8 +82,8 @@ TEST(mc, runtime_module) {
 }
 
 TEST(mc, runtime_namespace) {
-    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
-    BasicDefinitions basicDefs;
+    constexpr rosewood::meta_BasicDefinitions rbd;
+    rosewood::DNamespaceWrapper basicDefs(rbd);
 
     const rosewood::DNamespace *dBasic = basicDefs.getNamespaces()[0];
 
@@ -93,8 +93,8 @@ TEST(mc, runtime_namespace) {
 }
 
 TEST(mc, runtime_searches) {
-    using BasicDefinitions = rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>;
-    BasicDefinitions basicDefs;
+    constexpr rosewood::meta_BasicDefinitions rbd;
+    rosewood::DNamespaceWrapper basicDefs(rbd);
 
     EXPECT_NO_THROW(basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger"));
     auto aMethod = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger");
@@ -117,8 +117,9 @@ TEST(mc, runtime_searches) {
 }
 
 TEST(mc, string_wrap) {
-    using TemplateDeclarations = rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>;
-    TemplateDeclarations module;
+    constexpr rosewood::meta_TemplateDeclarations tds;
+    rosewood::DNamespaceWrapper module(tds);
+
     auto tdNamespace = module.findChildNamespace("td");
     auto strWrapper = tdNamespace->findChildClass("WrappedString");
 
@@ -130,7 +131,7 @@ TEST(mc, string_wrap) {
 }
 
 TEST(mc, index) {
-    using Index = rosewood::StaticIndex<rosewood::DNamespaceWrapper<rosewood::meta_BasicDefinitions>, rosewood::DNamespaceWrapper<rosewood::meta_TemplateDeclarations>>;
+    using Index = rosewood::StaticIndex<rosewood::meta_BasicDefinitions, rosewood::meta_TemplateDeclarations>;
     Index index;
 
     static constexpr auto method =
