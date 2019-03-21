@@ -64,6 +64,7 @@ namespace rosewood {
         using type = std::tuple<Tail...>;
     };
 
+    struct OpaqueType {};
 
     template<typename T>
     struct meta;

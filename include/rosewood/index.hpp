@@ -9,13 +9,17 @@
 
 namespace rosewood {
 
+    class Index {
+    public:
+        virtual ~Index() = 0;
+    };
 /**
  *  @class StaticIndex is a utlity that makes searching for declarations easier.
  * Declarations are essentially stored in a tree
  * so this class flattens that structure and maintains a bunch of data structures for fast lookups (has tables?)
  */
 template <typename ...WrappedTypes>
-class StaticIndex {
+class StaticIndex : public Index {
 
 
 private:
