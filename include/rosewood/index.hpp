@@ -12,6 +12,7 @@ namespace rosewood {
     class Index {
     public:
         virtual ~Index() = 0;
+        virtual const DMetaDecl *getDeclaration(std::string_view) = 0;
     };
 /**
  *  @class StaticIndex is a utlity that makes searching for declarations easier.
@@ -23,6 +24,13 @@ class StaticIndex : public Index {
 public:
     StaticIndex() {
         init_toplevel_lookups();
+    }
+
+    virtual const DMetaDecl *getDeclaration(std::string_view name) {
+        if (auto res = toplevel_declarations.find(name); res != toplevel_declarations.end()) {
+            return res->second.get();
+        }
+        return nullptr;
     }
 
 private:

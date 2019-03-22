@@ -9,13 +9,21 @@
 %code requires {
     namespace moose {
         class Lexer;
+        class Driver;
     }
+#include <memory>
+
+#include <moose/ast.h>
 
 #undef YY_NULLPTR
 #define YY_NULLPTR nullptr
+
+#include <string_view>
 }
 
 %parse-param {Lexer &lexer}
+%parse-param {Driver &driver}
+
 
 %code{
 #include <iostream>
@@ -35,7 +43,6 @@
 %token                          BLANK
 %token                          NEWLINE
 %token <std::string>            IDENTIFIER
-%token                          EQ
 %token                          RPARAN
 %token                          LPARAN
 %token                          COMMA
@@ -43,42 +50,55 @@
 %token                          COLON
 %token <std::string>            STRING
 
+%token <std::int64_t>           INTEGER_NUM
+%token <double>                 FLOATIN_NUM
+
+%token                          EQ
+%token                          PLUS
+%token                          MINUS
+%token                          EQEQ
+%token                          ASTERISK
+
+
 %locations
 
-%type <std::string>             literal
-
+%type <std::shared_ptr<moose::ast::Expr>>                   literal parameter expression
+%type <std::shared_ptr<moose::ast::BinaryOperator>>         binary_op
+%type <std::shared_ptr<moose::ast::CallExpr>>               call_expr
 %%
 script:
         block END
     ;
 
 block:
-        block expression
-    |   expression
+        block statement
+    |   statement
+    ;
+
+statement:
+        expression SCOLON                   {}
     ;
 
 expression:
-        assignment
-    |   function_call
-    |   literal
+        call_expr                           {$$ = $1;}
+    |   literal                             {$$ = $1;}
+    |   binary_op                           {$$ = $1;}
     ;
 
-assignment:
-        IDENTIFIER EQ expression SCOLON {
-            std::cerr << fmt::format("assignment to {}\n", $1);
-        }
+binary_op:
+        expression PLUS expression          { $$ = std::make_shared<moose::ast::BinaryOperator>($1, "+", $3);}
+    |   expression EQ expression            { $$ = std::make_shared<moose::ast::BinaryOperator>($1, "=", $3);}
+    |   expression MINUS expression         { $$ = std::make_shared<moose::ast::BinaryOperator>($1, "-", $3);}
     ;
 
-function_call:
-        IDENTIFIER LPARAN parameter_list RPARAN SCOLON {
-            std::cerr << fmt::format("Calling {}\n", $1);
-        }
+call_expr:
+        IDENTIFIER LPARAN parameter_list RPARAN { $$ = std::make_shared<moose::ast::CallExpr>();}
     ;
 
 parameter_list:
-        parameter_list COMMA parameter
-    |   parameter
-    |   %empty
+        parameter_list COMMA parameter  {std::cerr << "parameter list \n";}
+    |   parameter                       {std::cerr << "parameter list \n";}
+    |   %empty                          {std::cerr << "parameter list (empty)\n";}
     ;
 
 parameter:
@@ -86,19 +106,26 @@ parameter:
             std::cerr << fmt::format("Puhsing identifier arg {}\n", $1);
         }
     |   expression {
-            std::cerr << "Pushing expression arg\n";
+            $$ = $1;
         }
-
     |   literal {
-            std::cerr << "Pushing literal arg \"" << $1 << "\"\n";
+            $$ = $1;
         }
     ;
 
 
 literal:
         STRING  {
-            $$ = $1;
+            $$ = std::make_shared<moose::ast::StringLiteral>($1);
             std::cerr << "Pushing string literal \"" << $1 << "\"\n";
+        }
+    |   INTEGER_NUM {
+            $$ = std::make_shared<moose::ast::IntegralLiteral>($1);
+            std::cerr << "Pushing integer literal \"" << $1 << "\"\n";
+        }
+    |   FLOATIN_NUM {
+            $$ = std::make_shared<moose::ast::FloatingPLiteral>($1);
+            std::cerr << "Pushing float literal \"" << $1 << "\"\n";
         }
     ;
 %%

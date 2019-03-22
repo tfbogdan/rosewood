@@ -1,9 +1,10 @@
 %{
 /* C++ string header, for string ops below */
 #include <string>
-
+#include <fmt/format.h>
 #include <parser.hpp>
 #include <Lexer.h>
+#include <sstream>
 
 #undef  YY_DECL
 #define YY_DECL int moose::Lexer::yylex( moose::Parser::semantic_type * const lval, moose::Parser::location_type *location )
@@ -18,7 +19,8 @@ using token = moose::Parser::token;
 #define YY_NO_UNISTD_H
 
 /* update location on matching */
-#define YY_USER_ACTION loc->step(); loc->columns(yyleng);
+// #define YY_USER_ACTION loc->step(); loc->columns(yyleng);
+#define YY_USER_ACTION location->step(); location->columns(yyleng);
 
 %}
 
@@ -27,24 +29,96 @@ using token = moose::Parser::token;
 %option yyclass="moose::Lexer"
 %option noyywrap
 %option c++
+%option yylineno
 
+
+%x COMMENT
+%x NESTED_IDENTIFIER
 
 %%
 %{  /** Code executed at the beginning of yylex **/
     yylval = lval;
 %}
 
+"/*" { BEGIN(COMMENT); }
+<COMMENT>"*/" { BEGIN(INITIAL); }
+<COMMENT>(.|\n) ;
+<COMMENT><<EOF>> { /*err*/ }
+
 [ \t\r]+ {
 }
 
 [\n] {
-    loc->lines();
+    location->lines();
 }
 
 [a-zA-Z_][a-zA-Z0-9_]* {
     yylval->build< std::string >(yytext);
+    // a plain identifier
+    switch(driver.identifierType(yytext)) {
+
+    }
     return token::IDENTIFIER;
 }
+
+[a-zA-Z_][a-zA-Z0-9_]*\. {
+    BEGIN(NESTED_IDENTIFIER);
+
+    ident_lookup_stack = std::stack<const rosewood::DeclarationContext*>{};
+    auto decl = driver.getDeclaration(std::string_view(yytext, yyleng - 1));
+    if (!decl || !decl->asDeclContext()) {
+        std::cerr << fmt::format("Error: identifier '{}' is not a top level declaration. Going to crash.. \n", std::string_view(yytext, yyleng - 1));
+    }
+    ident_lookup_stack.push(decl->asDeclContext());
+}
+
+<NESTED_IDENTIFIER>[a-zA-Z_][a-zA-Z0-9_]* {
+    auto parentDecl = ident_lookup_stack.top();
+    auto decl = parentDecl->getDeclaration(std::string_view(yytext, yyleng));
+    if (!decl) {
+        std::cerr << fmt::format("Error: identifier '{}' is not a declaration. Going to crash.. \n", std::string_view(yytext, yyleng - 1));
+    }
+
+    BEGIN(INITIAL);
+    // one should now return a token
+    std::cerr << "End nested identifier at " << std::string_view(yytext, yyleng) << "\n";
+}
+
+<NESTED_IDENTIFIER>[a-zA-Z_][a-zA-Z0-9_]*\. {
+    auto parentDecl = ident_lookup_stack.top();
+    auto decl = parentDecl->getDeclaration(std::string_view(yytext, yyleng - 1));
+    if (!decl || !decl->asDeclContext()) {
+        std::cerr << fmt::format("Error: identifier '{}' is not a declaration context. Going to crash.. \n", std::string_view(yytext, yyleng - 1));
+    }
+    ident_lookup_stack.push(decl->asDeclContext());
+    std::cerr << "Continue nested identifier at " << std::string_view(yytext, yyleng - 1) << "\n";
+}
+
+[1-9][0-9]* {
+    std::istringstream ss(yytext);
+    std::int64_t v;
+    ss >> v;
+    yylval->build<std::int64_t>(v);
+    return token::INTEGER_NUM;
+}
+
+[0]{1}[xX]{1}[1-9a-fA-F]+ {
+    std::istringstream ss(yytext);
+    std::int64_t v;
+    ss >> std::hex>> v;
+    yylval->build<std::int64_t>(v);
+    return token::INTEGER_NUM;
+}
+
+
+[1-9][0-9]*.[0-9]* {
+    std::istringstream ss(yytext);
+    double v;
+    ss >> v;
+    yylval->build<double>(v);
+    return token::FLOATIN_NUM;
+}
+
 
 [=] {
     return token::EQ;

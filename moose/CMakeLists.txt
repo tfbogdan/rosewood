@@ -27,6 +27,12 @@ target_sources(moose PRIVATE
 
     moose.cpp
     moose/moose.hpp
+
+    ast.cpp
+    moose/ast.h
+
+    driver.h
+    driver.cpp
 )
 
 target_include_directories(moose PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
