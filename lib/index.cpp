@@ -2,5 +2,4 @@
 
 namespace rosewood {
 
-    Index::~Index() = default;
 }

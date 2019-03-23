@@ -1,5 +1,5 @@
 #include "driver.h"
-
+#include <iostream>
 
 namespace moose {
 
@@ -18,7 +18,11 @@ namespace moose {
         return IdentType::Undefined;
     }
 
-    const rosewood::DMetaDecl *Driver::getDeclaration(std::string_view ident) {
+    const rosewood::Declaration *Driver::getDeclaration(std::string_view ident) {
         return index.getDeclaration(ident);
+    }
+
+    void Driver::pushExpression(std::shared_ptr<moose::ast::Expr> expr) {
+        std::cerr << "About now I should start evaluating expressions.\n";
     }
 }

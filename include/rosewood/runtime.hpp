@@ -14,47 +14,6 @@ namespace rosewood {
         using std::logic_error::logic_error;
     };
 
-namespace detail {
-
-template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
-struct range_model {
-    using wrapped_elements_tuple = typename tuple_elements_wrapper<wrapperType, std::tuple<>, sourceTupleT>::type;
-    static const wrapped_elements_tuple wrapped_elements;
-
-    static constexpr int num_elements = std::tuple_size<sourceTupleT>::value;
-
-    using base_array_t = std::array<const baseType*, num_elements>;
-    static constexpr auto array_initializer() {
-        return std::apply([](const auto& ...elems) {
-            base_array_t result{};
-            int index(0);
-            ((result[index++] = &elems), ...);
-            return result;
-        }, wrapped_elements);
-    }
-
-    static constexpr base_array_t base_array = array_initializer();
-
-    using map_type = std::unordered_map<std::string_view, const baseType*>;
-    static constexpr auto map_initializer() {
-        return std::apply([](const auto& ...elems) {
-            map_type result;
-            ((result[elems.getName()] = &elems), ...);
-            return result;
-        }, wrapped_elements);
-    }
-
-    static const map_type element_map;
-};
-
-template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
-const typename range_model<sourceTupleT, baseType, wrapperType>::wrapped_elements_tuple range_model<sourceTupleT, baseType, wrapperType>::wrapped_elements{};
-
-template <typename sourceTupleT, typename baseType, template<typename> typename wrapperType>
-const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_model<sourceTupleT, baseType, wrapperType>::element_map = range_model<sourceTupleT, baseType, wrapperType>::map_initializer();
-
-}
-
     class DeclarationContext;
 
     class DType {
@@ -107,43 +66,61 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         virtual const DType *getType() const noexcept = 0;
     };
 
+
     class DNamespace;
-    class DClass;
+    class Class;
     class DEnum;
-    class DOverloadSet;
     class DMethod;
     class DEnumerator;
     class DField;
+    class TypeDeclaration;
 
-    class DMetaDecl {
+    class Declaration {
     public:
-        virtual ~DMetaDecl() = 0;
+        explicit Declaration(const DeclarationContext *Parent);
+
+        virtual ~Declaration() = 0;
         virtual std::string_view getName() const noexcept = 0;
         // virtual std::string_view getQualifiedName() const noexcept = 0;
 
         virtual const DNamespace *asNamespace() const noexcept;
-        virtual const DClass *asClass() const noexcept;
+        virtual const Class *asClass() const noexcept;
         virtual const DEnum *asEnum() const noexcept;
         virtual const DEnumerator *asEnumerator() const noexcept;
-        virtual const DOverloadSet *asOverloadSet() const noexcept;
         virtual const DMethod *asMethod() const noexcept;
         virtual const DField *asField() const noexcept;
         virtual const DeclarationContext *asDeclContext() const noexcept;
+        virtual const TypeDeclaration *asTypeDeclaration() const noexcept;
+
+        virtual const DeclarationContext *parent() const noexcept;
+
+    private:
+        const DeclarationContext *parentP;
+    };
+
+    class TypeDeclaration : public Declaration {
+    public:
+        using Declaration::Declaration;
+
+        virtual ~TypeDeclaration() = 0;
+
+        const TypeDeclaration *asTypeDeclaration() const noexcept final;
+    public:
     };
 
     class DeclarationContext {
     public:
         virtual ~DeclarationContext() = 0;
-        virtual const DMetaDecl *getDeclaration(std::string_view name) const noexcept = 0;
+        virtual const Declaration *getDeclaration(std::string_view name) const noexcept = 0;
     };
 
-    class DClass;
+    class Class;
 
     template <typename Descriptor>
     class DClassWrapper;
 
     class DEnum;
-    class DEnumerator : public DMetaDecl {
+    class DEnumerator : public Declaration {
     public:
         virtual ~DEnumerator() = 0;
         virtual long long getValue() const noexcept = 0;
@@ -165,8 +142,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         const Descriptor descriptor;
     };
 
-    class DEnum : public DMetaDecl {
+    class DEnum : public TypeDeclaration {
     public:
+        using TypeDeclaration::TypeDeclaration;
+
         virtual ~DEnum() = 0;
         virtual const DEnum *asEnum() const noexcept final;
         virtual std::vector<const DEnumerator*> getEnumerators() const noexcept = 0;
@@ -177,7 +156,10 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     class DEnumWrapper : public DEnum {
         using descriptor = MetaEnum;
     public:
-        DEnumWrapper(const MetaEnum &me) {}
+        DEnumWrapper(const MetaEnum &me, const DeclarationContext* parent)
+            : DEnum(parent) {
+            initEnumeratorsVector();
+        }
 
         inline virtual ~DEnumWrapper() = default;
 
@@ -194,27 +176,25 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         }
 
     private:
-        static const std::vector<DEnumeratorWrapper<typename descriptor::enumerator_type>> enumerators;
+        void initEnumeratorsVector() {
+            enumerators.reserve(MetaEnum::enumerators.size());
+            for (const auto &en: MetaEnum::enumerators) {
+                enumerators.emplace_back(en);
+            }
+        }
+        std::vector<DEnumeratorWrapper<typename descriptor::enumerator_type>> enumerators;
     };
 
-    template<typename MetaEnum>
-    std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> initEnumeratorsVector() {
-        std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> result;
-        result.reserve(MetaEnum::enumerators.size());
-        for (const auto &en: MetaEnum::enumerators) {
-            result.emplace_back(en);
-        }
-        return result;
-    }
+    template <typename T>
+    DEnumWrapper(const T&, const DeclarationContext*) -> DEnumWrapper<T>;
 
-    template<typename MetaEnum>
-    const std::vector<DEnumeratorWrapper<typename MetaEnum::enumerator_type>> DEnumWrapper<MetaEnum>::enumerators =
-        initEnumeratorsVector<MetaEnum>();
 
-    class DClass;
+    class Class;
 
-    class DNamespace : public DMetaDecl, public DeclarationContext {
+    class DNamespace : public Declaration, public DeclarationContext {
     public:
+        using Declaration::Declaration;
+
         virtual ~DNamespace() = 0;
         // virtual const std::vector<const DNamespace*> getNamespaces() const noexcept = 0;
         // virtual const std::vector<const DEnum*> getEnums() const noexcept = 0;
@@ -225,7 +205,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     private:
     };
 
-    class DParameter : public DMetaDecl, public DTypedDeclaration {
+    class DParameter : public Declaration, public DTypedDeclaration {
     public:
         virtual ~DParameter() = 0;
     };
@@ -251,8 +231,9 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     const typename DParameterWrapper<Descriptor>::param_type DParameterWrapper<Descriptor>::type(Descriptor::type);
 
 
-    class DMethod : public DMetaDecl {
+    class DMethod : public Declaration {
     public:
+        using Declaration::Declaration;
         virtual ~DMethod() = 0;
 
         /**
@@ -266,16 +247,20 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         virtual void call(void *object, void *retValAddr, void **args) const = 0;
 
         virtual const DType *getReturnType() const noexcept = 0;
-    private:
+        const DMethod *getNextOverload() const noexcept;
 
+        void pushOverload(std::unique_ptr<DMethod> &&next);
+    private:
+        std::unique_ptr<DMethod> nextOverload = nullptr;
     };
 
     template <typename Descriptor>
     class DMethodWrapper : public DMethod {
     public:
 
-        DMethodWrapper(const Descriptor& desc)
-            :descriptor(desc) {
+        DMethodWrapper(const Descriptor& desc, const DeclarationContext* parent)
+            : DMethod(parent),
+              descriptor(desc) {
         }
 
         inline virtual std::string_view getName() const noexcept final {
@@ -308,34 +293,27 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         Descriptor descriptor;
     };
 
+    template <typename T>
+    DMethodWrapper(const T&, const DeclarationContext*) -> DMethodWrapper<T>;
+
+    template <typename T>
+    auto makeUniqueMethod(const T& d, const DeclarationContext*p) {
+        return std::make_unique<DMethodWrapper<T>>(d, p);
+    }
+
+    template <typename T>
+    auto makeMethod(const T& d, const DeclarationContext*p) {
+        return new DMethodWrapper<T>(d, p);
+    }
+
+
     // template <typename Descriptor>
     // const typename DMethodWrapper<Descriptor>::return_type DMethodWrapper<Descriptor>::returntype(Descriptor::return_type);
 
-    class DOverloadSet : public DMetaDecl {
+    class DField : public Declaration, public DTypedDeclaration {
     public:
-        virtual ~DOverloadSet() = 0;
-        virtual std::vector<const DMethod*> getMethods() const noexcept = 0;
-    };
+        using Declaration::Declaration;
 
-    template <typename Descriptor>
-    class DOverloadSetWrapper : public DOverloadSet {
-    public:
-        inline virtual ~DOverloadSetWrapper() = default;
-        inline virtual std::string_view getName() const noexcept final {
-            return Descriptor::name;
-        }
-
-        inline virtual std::vector<const DMethod*> getMethods() const noexcept final {
-            return std::vector<const DMethod*>(overloads.base_array.begin(), overloads.base_array.end());
-        }
-
-    private:
-        using overload_model =detail::range_model<typename Descriptor::overloads, DMethod, DMethodWrapper>;
-        static constexpr overload_model overloads {};
-    };
-
-    class DField : public DMetaDecl, public DTypedDeclaration {
-    public:
         virtual ~DField() = 0;
         virtual void assign_copy(void* o, void* a) const = 0;
         virtual void assign_move(void* o, void* a) const = 0;
@@ -346,8 +324,9 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
     public:
         inline virtual ~DFieldWrapper() = default;
 
-        DFieldWrapper(Descriptor& desc)
-            :descriptor(desc) {}
+        DFieldWrapper(const Descriptor &desc, const DeclarationContext *parent)
+            :DField(parent),
+             descriptor(desc) {}
 
         inline virtual std::string_view getName() const noexcept final {
             return descriptor.name;
@@ -371,29 +350,39 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         Descriptor descriptor;
     };
 
+    template <typename T>
+    auto makeField(const T &d, const DeclarationContext* p) {
+        return std::make_unique<DFieldWrapper<T>>(d, p);
+    }
+
     // template <typename Descriptor>
     // const typename DFieldWrapper<Descriptor>::type_information DFieldWrapper<Descriptor>::type(Descriptor::type);
 
-    class DClass : public DMetaDecl, public DeclarationContext {
+    class Class : public TypeDeclaration, public DeclarationContext {
     public:
-        virtual ~DClass() = 0;
+        using TypeDeclaration::TypeDeclaration;
+        virtual ~Class() = 0;
         // virtual const DMethod *findMethod(std::string_view name) const noexcept = 0;
         // virtual const DField *findField(std::string_view name) const noexcept(false) = 0;
-        const DClass *asClass() const noexcept final;
+        const Class *asClass() const noexcept final;
         const DeclarationContext *asDeclContext() const noexcept final;
     private:
     };
 
     template <typename MetaClass>
-    class DClassWrapper : public DClass {
+    class ClassWrapper : public Class {
     public:
         using descriptor = MetaClass;
 
-        DClassWrapper(MetaClass mc)
-            : method_map(initialize_method_map()),
-              field_map(initialize_field_map()) {}
+        ClassWrapper(const MetaClass &mc, const DeclarationContext *parent)
+            : Class(parent) {
 
-        inline ~DClassWrapper() = default;
+            initMethods();
+            initEnums();
+            initFields();
+        }
+
+        inline ~ClassWrapper() = default;
 
         inline std::string_view getName() const noexcept final {
             return descriptor::name;
@@ -425,7 +414,7 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return nullptr;
         }*/
 
-        inline const DMetaDecl *getDeclaration(std::string_view name) const noexcept final {
+        inline const Declaration *getDeclaration(std::string_view name) const noexcept final {
             return nullptr; // TDO DUUUUUH
         }
 
@@ -439,44 +428,64 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
         // using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
         // static constexpr class_range classes = {};
 
-        decltype(auto) initialize_method_map() noexcept {
-            std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> value;
-            std::apply([&value](auto ...mts) {
-                (value[mts.name].emplace_back(new DMethodWrapper(mts)), ...);
+        void initMethods() {
+            std::unordered_map<std::string_view, std::unique_ptr<DMethod>> all_methods;
+            std::apply([&all_methods, this](auto &&...mts) {
+                bool added;
+                (((added = static_cast<bool>(all_methods[mts.name])), (added ? all_methods[mts.name]->pushOverload(makeUniqueMethod(mts, this)) : static_cast<void>(all_methods[mts.name] = makeUniqueMethod(mts, this)))), ...);
             }, descriptor::methods);
-            return value;
+            for (auto& [nm, pv]: all_methods) {
+                declarations[nm] = std::move(pv);
+            }
         }
 
-        decltype(auto) initialize_field_map() noexcept {
-            std::unordered_map<std::string_view, std::unique_ptr<const DField>> value;
-            std::apply([&value](auto ...fields) {
-                ((value[fields.name].reset(new DFieldWrapper(fields))), ...);
+        void initFields() {
+            std::apply([this](auto &&...fields) {
+                ((declarations[fields.name] = makeField(fields, this)), ...);
             }, descriptor::fields);
-            return value;
         }
 
-        // const auto methods = descriptor::methods;
-        const std::unordered_map<std::string_view, std::vector<std::unique_ptr<const DMethod>>> method_map;
-        const std::unordered_map<std::string_view, std::unique_ptr<const DField>> field_map;
+        void initEnums() {
+            using enums_type = typename descriptor::enums;
+            enums_type enums;
+            std::apply([this](auto &&...enms) {
+                ((declarations[enms.name] = makeEnum(enms, this)), ...);
+            }, enums);
+        }
 
-        // using field_model = detail::range_model<typename descriptor::fields, DField, DFieldWrapper>;
-        // static constexpr field_model  fields {};
+        std::unordered_map<std::string_view, std::unique_ptr<Declaration>> declarations;
     };
+
+    template <typename T>
+    DClassWrapper(const T&, const DeclarationContext*) -> DClassWrapper<T>;
+
 
     template<typename MetaNamespace>
     class DNamespaceWrapper;
 
     template <typename T>
-    auto makeNamespace(T v) {
-        return new DNamespaceWrapper(v);
+    auto makeNamespace(const T &v, const DeclarationContext *p) {
+        return std::make_unique<DNamespaceWrapper<T>>(v, p);
     }
+
+    template <typename T>
+    auto makeClass(const T &v, const DeclarationContext *p) {
+        return std::make_unique<ClassWrapper<T>>(v, p);
+    }
+
+    template <typename T>
+    auto makeEnum(const T &v, const DeclarationContext *p) {
+        return std::make_unique<DEnumWrapper<T>>(v, p);
+    }
+
 
     template<typename MetaNamespace>
     class DNamespaceWrapper : public DNamespace {
         using descriptor = MetaNamespace;
     public:
 
-        DNamespaceWrapper(MetaNamespace mn) {
+        DNamespaceWrapper(const MetaNamespace& mn, const DeclarationContext *parent)
+            : DNamespace(parent) {
             initClasses();
             initNamespaces();
         }
@@ -487,53 +496,26 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             return descriptor::name;
         }
 
-//        inline virtual const std::vector<const DNamespace*> getNamespaces() const noexcept override final {
-//            return std::vector<const DNamespace*>();//namespaces.base_array.begin(), namespaces.base_array.end());
-//        }
-
-//        inline virtual const std::vector<const DClass*> getClasses() const noexcept override final {
-//            return std::vector<const DClass*>(); /*
-//                        classes.base_array.begin(),
-//                        classes.base_array.end()
-//            );*/
-//        }
-
-//        inline virtual const std::vector<const DEnum*> getEnums() const noexcept override final {
-//            return std::vector<const DEnum*>(); /*
-//                        enums.base_array.begin(),
-//                        enums.base_array.end()
-//            );*/
-//        }
-
-//        inline virtual const DNamespace *findChildNamespace(std::string_view name) const noexcept(false) override final {
-//            return nullptr;// namespaces.element_map.at(name);
-//        }
-
-//        inline virtual const DClass *findChildClass(std::string_view name) const noexcept(false) override final {
-//            return nullptr;// classes.element_map.at(name);
-//        }
-
-//        inline virtual const DEnum *findChildEnum(std::string_view name) const noexcept(false) override final {
-//            return nullptr; // enums.element_map.at(name);
-//        }
-
-        inline const DMetaDecl *getDeclaration(std::string_view name) const noexcept final {
+        inline const Declaration *getDeclaration(std::string_view name) const noexcept final {
             auto res = declarations.find(name);
             return res != declarations.end() ? res->second.get() : nullptr;
         }
 
     protected:
-        // using enum_range = detail::range_model<typename MetaNamespace::enums, DEnum, DEnumWrapper>;
-        // static constexpr enum_range enums = {};
 
-        // using class_range = detail::range_model<typename MetaNamespace::classes, DClass, DClassWrapper>;
-        // static constexpr class_range classes = {};
+        void initEnums() {
+            using enums_type = typename MetaNamespace::enums;
+            enums_type enums;
+            std::apply([this](auto &&...enms) {
+                ((declarations[enms.name] = makeEnum(enms, this)), ...);
+            }, enums);
+        }
 
         void initClasses() {
             using classes_tuple = typename MetaNamespace::classes;
             classes_tuple ctup;
             std::apply([this](auto &&...clses) {
-                ((declarations[clses.name].reset(new DClassWrapper(clses))), ...);
+                ((declarations[clses.name] = makeClass(clses, this)), ...);
             }, ctup);
         }
 
@@ -542,17 +524,13 @@ const typename range_model<sourceTupleT, baseType, wrapperType>::map_type range_
             namespaces_tuple namespaces;
 
             std::apply([this](auto &&...nmspcs) {
-                ((declarations[nmspcs.name].reset(makeNamespace(nmspcs))), ...);
+                ((declarations[nmspcs.name] = makeNamespace(nmspcs, this)), ...);
             }, namespaces);
-
         }
-
-        std::unordered_map<std::string_view, std::unique_ptr<const DMetaDecl>> declarations;
-
-        // template <typename T>
-        // using disambiguator = DNamespaceWrapper<T>;
-        // using namespaces_model = detail::range_model<typename descriptor::namespaces, DNamespace, disambiguator>;
-        // static constexpr namespaces_model namespaces {};
+        std::unordered_map<std::string_view, std::unique_ptr<Declaration>> declarations;
     };
+
+    template <typename T>
+    DNamespaceWrapper(const T&, const DeclarationContext*) -> DNamespaceWrapper<T>;
 
 }

@@ -12,8 +12,8 @@
         class Driver;
     }
 #include <memory>
-
 #include <moose/ast.h>
+#include <rosewood/index.hpp>
 
 #undef YY_NULLPTR
 #define YY_NULLPTR nullptr
@@ -59,12 +59,20 @@
 %token                          EQEQ
 %token                          ASTERISK
 
+%token <moose::ast::TypeRef>                    TYPENAME
+%token <std::string>                            UNDEFINED_QUALNAME
+%token <std::string>                            NEW_IDENTIFIER
+
 
 %locations
 
-%type <std::shared_ptr<moose::ast::Expr>>                   literal parameter expression
+%type <std::shared_ptr<moose::ast::Expr>>                   literal expression
 %type <std::shared_ptr<moose::ast::BinaryOperator>>         binary_op
 %type <std::shared_ptr<moose::ast::CallExpr>>               call_expr
+%type <std::shared_ptr<moose::ast::VarDecl>>                var_decl
+%type <std::vector<std::shared_ptr<moose::ast::Expr>>>      parameter_list
+%type <std::vector<std::shared_ptr<moose::ast::Expr>>>      cslist;
+
 %%
 script:
         block END
@@ -76,13 +84,21 @@ block:
     ;
 
 statement:
-        expression SCOLON                   {}
+        expression SCOLON                   { driver.pushExpression($1);}
+    |   SCOLON                              { /*It's a nop*/ }
+    |   cslist SCOLON                       { driver.pushExpression($1.begin(), $1.end()); }
     ;
 
 expression:
         call_expr                           {$$ = $1;}
     |   literal                             {$$ = $1;}
     |   binary_op                           {$$ = $1;}
+    |   var_decl                            {$$ = $1;}
+    // |   cslist                              { /* TDO */ }
+    ;
+
+var_decl:
+        NEW_IDENTIFIER COLON TYPENAME parameter_list { $$ = std::make_shared<moose::ast::VarDecl>($1, $3, $4.begin(), $4.end()); }
     ;
 
 binary_op:
@@ -92,40 +108,28 @@ binary_op:
     ;
 
 call_expr:
-        IDENTIFIER LPARAN parameter_list RPARAN { $$ = std::make_shared<moose::ast::CallExpr>();}
+        IDENTIFIER parameter_list { $$ = std::make_shared<moose::ast::CallExpr>();}
     ;
 
 parameter_list:
-        parameter_list COMMA parameter  {std::cerr << "parameter list \n";}
-    |   parameter                       {std::cerr << "parameter list \n";}
-    |   %empty                          {std::cerr << "parameter list (empty)\n";}
+        LPARAN cslist RPARAN    { $$ = std::move($2); }
+    |   LPARAN RPARAN           { }
     ;
 
-parameter:
-        IDENTIFIER {
-            std::cerr << fmt::format("Puhsing identifier arg {}\n", $1);
-        }
-    |   expression {
-            $$ = $1;
-        }
-    |   literal {
-            $$ = $1;
-        }
+cslist:
+        expression                      { $$.emplace_back($1);}
+    |   expression COMMA cslist         { $$.emplace_back($1); $$.insert($$.end(), $3.begin(), $3.end()); }
     ;
-
 
 literal:
         STRING  {
             $$ = std::make_shared<moose::ast::StringLiteral>($1);
-            std::cerr << "Pushing string literal \"" << $1 << "\"\n";
         }
     |   INTEGER_NUM {
             $$ = std::make_shared<moose::ast::IntegralLiteral>($1);
-            std::cerr << "Pushing integer literal \"" << $1 << "\"\n";
         }
     |   FLOATIN_NUM {
             $$ = std::make_shared<moose::ast::FloatingPLiteral>($1);
-            std::cerr << "Pushing float literal \"" << $1 << "\"\n";
         }
     ;
 %%

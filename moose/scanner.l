@@ -5,6 +5,7 @@
 #include <parser.hpp>
 #include <Lexer.h>
 #include <sstream>
+#include <moose/ast.h>
 
 #undef  YY_DECL
 #define YY_DECL int moose::Lexer::yylex( moose::Parser::semantic_type * const lval, moose::Parser::location_type *location )
@@ -45,20 +46,20 @@ using token = moose::Parser::token;
 <COMMENT>(.|\n) ;
 <COMMENT><<EOF>> { /*err*/ }
 
-[ \t\r]+ {
+[ \t]+ {
 }
 
-[\n] {
+[\n]|[\r\n] {
     location->lines();
 }
 
 [a-zA-Z_][a-zA-Z0-9_]* {
     yylval->build< std::string >(yytext);
     // a plain identifier
-    switch(driver.identifierType(yytext)) {
-
-    }
-    return token::IDENTIFIER;
+    // switch(driver.identifierType(yytext)) {
+    // this could be something else too. Could be an existing variable, for example .TDO: handle that
+    // }
+    return token::NEW_IDENTIFIER;
 }
 
 [a-zA-Z_][a-zA-Z0-9_]*\. {
@@ -80,8 +81,13 @@ using token = moose::Parser::token;
     }
 
     BEGIN(INITIAL);
-    // one should now return a token
-    std::cerr << "End nested identifier at " << std::string_view(yytext, yyleng) << "\n";
+    if (decl->asTypeDeclaration()) {
+        yylval->build<moose::ast::TypeRef>(moose::ast::TypeRef{decl->asTypeDeclaration()});
+        return token::TYPENAME;
+    }
+
+    yylval->build< std::string >(yytext);
+    return token::UNDEFINED_QUALNAME;
 }
 
 <NESTED_IDENTIFIER>[a-zA-Z_][a-zA-Z0-9_]*\. {
@@ -91,7 +97,6 @@ using token = moose::Parser::token;
         std::cerr << fmt::format("Error: identifier '{}' is not a declaration context. Going to crash.. \n", std::string_view(yytext, yyleng - 1));
     }
     ident_lookup_stack.push(decl->asDeclContext());
-    std::cerr << "Continue nested identifier at " << std::string_view(yytext, yyleng - 1) << "\n";
 }
 
 [1-9][0-9]* {
@@ -102,7 +107,7 @@ using token = moose::Parser::token;
     return token::INTEGER_NUM;
 }
 
-[0]{1}[xX]{1}[1-9a-fA-F]+ {
+((0x)|(0X))[1-9a-fA-F]+ {
     std::istringstream ss(yytext);
     std::int64_t v;
     ss >> std::hex>> v;
@@ -111,7 +116,7 @@ using token = moose::Parser::token;
 }
 
 
-[1-9][0-9]*.[0-9]* {
+([1-9][0-9]*)*\.[0-9]* {
     std::istringstream ss(yytext);
     double v;
     ss >> v;

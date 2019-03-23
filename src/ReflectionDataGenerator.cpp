@@ -190,12 +190,32 @@ namespace mc {
         return isIt;
     }
 
+    bool isKnownNoExcept(const clang::CXXMethodDecl *method) {
+        bool isIt = false;
+        auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
+        auto exceptionSpecifier = functionPrototype->getExceptionSpecType();
+
+        switch (exceptionSpecifier) {
+            case clang::ExceptionSpecificationType::EST_NoexceptTrue:
+                [[fallthrough]];
+            case clang::ExceptionSpecificationType::EST_BasicNoexcept:
+                [[fallthrough]];
+            case clang::ExceptionSpecificationType::EST_NoexceptFalse:
+                return true;
+            default:
+            break;
+        }
+        return false;
+    }
+
+
     std::string ReflectionDataGenerator::buildMethodSignature(const clang::CXXMethodDecl *method) {
         // build the argument list
         llvm::SmallVector<char, 1024> buff;
         llvm::raw_svector_ostream sstream(buff);
         auto functionPrototype = method->getType()->getAs<clang::FunctionProtoType>();
         bool noExcept = isNoExcept(method);
+
         sstream << method->getReturnType().getCanonicalType().getAsString(printingPolicy);
         sstream << fmt::format(" ({}::*) (", clang::QualType(method->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy));
         if (method->parameters().empty()) {
@@ -208,10 +228,11 @@ namespace mc {
                 ++paramIdx;
             }
         }
+        std::string_view noexceptness = isKnownNoExcept(method) ? (noExcept ? "noexcept": "noexcept(false)") : "";
         sstream << ")";
         sstream << fmt::format("{}{}",
                                functionPrototype->isConst() ? " const" : "",
-                               noExcept ? " noexcept": "");
+                               noexceptness);
 
         auto res = sstream.str().str();
         return res;
@@ -345,6 +366,7 @@ namespace mc {
         auto exceptionSpecKind = functionPrototype->getExceptionSpecType();
         // cannot export a function if we cannot reliably determine it's exception specification
         // since that's part of the c++17 type system
+        return true;
         return  exceptionSpecKind != clang::ExceptionSpecificationType::EST_Uninstantiated &&
                 exceptionSpecKind != clang::ExceptionSpecificationType::EST_DependentNoexcept &&
                 exceptionSpecKind != clang::ExceptionSpecificationType::EST_Unevaluated;
@@ -353,7 +375,7 @@ namespace mc {
 
     descriptor_scope ReflectionDataGenerator::exportCxxRecord(const std::string &name, const clang::CXXRecordDecl *Record, descriptor_scope &where) {
 
-        auto ownScope = where.spawn(name, "rosewood::Class");
+        auto ownScope = where.spawn(name, "rosewood::StaticClass");
         ownScope.putline("using type = {};", clang::QualType(Record->getTypeForDecl(), 0).getAsString(printingPolicy));
         ownScope.putline("static constexpr std::string_view qualified_name = \"{}\";", Record->getQualifiedNameAsString());
         std::map<std::string_view, std::set<std::string>> descriptornames = {
@@ -384,13 +406,13 @@ namespace mc {
                     exportedMethods.push_back(method);
                 }
             } break;
-            case clang::Decl::Kind::CXXConstructor: {
+            case clang::Decl::Kind::CXXConstructor: /*{
                 auto ctor = static_cast<const clang::CXXConstructorDecl*>(decl);
                 if (!areMethodArgumentsPubliclyUsable(ctor)) continue;
                 if(!ctor->isDeleted()) {
                     constructors.push_back(ctor);
                 }
-            } break;
+            } */ break;
             case clang::Decl::Kind::CXXDestructor: {
                 destructor = static_cast<const clang::CXXDestructorDecl*>(decl);
             } break;
@@ -418,6 +440,13 @@ namespace mc {
 
             default:
                 break;
+            }
+        }
+
+        for (const auto& ctor: Record->ctors()) {
+            if (!areMethodArgumentsPubliclyUsable(ctor)) continue;
+            if(!ctor->isDeleted()) {
+                constructors.push_back(ctor);
             }
         }
 

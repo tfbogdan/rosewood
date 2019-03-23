@@ -36,38 +36,8 @@ namespace rosewood {
         using type = typename arguments_wrapper<wrapping_type, std::tuple<TupleTypes..., wrapping_type<Head>>, Types...>::type;
     };
 
-
-
-    template <typename T>
-    struct tuple_seeker;
-
-    template <typename headT, typename ...remainingTypes>
-    struct tuple_seeker<std::tuple<headT, remainingTypes...>> {
-        using tail = std::tuple<remainingTypes...>;
-    };
-
-    template <typename headT>
-    struct tuple_seeker<std::tuple<headT>> {
-        using tail = std::tuple<>;
-    };
-
-    template <typename>
-    struct tuple_tail;
-
-    template <typename ...Tail>
-    struct tuple_tail <std::tuple<Tail...>> {
-        using type = std::tuple<>;
-    };
-
-    template <typename Head, typename ...Tail>
-    struct tuple_tail <std::tuple<Head, Tail...>> {
-        using type = std::tuple<Tail...>;
-    };
-
-    struct OpaqueType {};
-
     template<typename T>
-    struct meta;
+    struct meta : public nil_t {};
 
     template<typename Descriptor>
     struct Module {};
@@ -325,7 +295,7 @@ namespace rosewood {
     };
 
     template<typename Descriptor>
-    struct Class {
+    struct StaticClass {
 
         using descriptor = Descriptor;
 
@@ -360,7 +330,7 @@ namespace rosewood {
     };
 
     template<typename DescType>
-    struct is_class<Class<DescType>> {
+    struct is_class<StaticClass<DescType>> {
         static constexpr bool value = true;
     };
 

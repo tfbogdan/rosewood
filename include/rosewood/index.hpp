@@ -9,10 +9,9 @@
 
 namespace rosewood {
 
-    class Index {
+    class Index : public DeclarationContext {
     public:
-        virtual ~Index() = 0;
-        virtual const DMetaDecl *getDeclaration(std::string_view) = 0;
+
     };
 /**
  *  @class StaticIndex is a utlity that makes searching for declarations easier.
@@ -26,7 +25,7 @@ public:
         init_toplevel_lookups();
     }
 
-    virtual const DMetaDecl *getDeclaration(std::string_view name) {
+    const Declaration *getDeclaration(std::string_view name) const noexcept final {
         if (auto res = toplevel_declarations.find(name); res != toplevel_declarations.end()) {
             return res->second.get();
         }
@@ -49,15 +48,15 @@ private:
             constexpr namespaces_type namespaces;
 
             std::apply([this] (auto &&...enums) {
-                ((toplevel_declarations[enums.name].reset(new DEnumWrapper(enums))), ...);
+                ((toplevel_declarations[enums.name] = std::move(std::make_unique<DEnumWrapper>((enums, this)))), ...);
             }, enums);
 
             std::apply([this] (auto &&...classes) {
-                ((toplevel_declarations[classes.name].reset(new DClassWrapper(classes))), ...);
+                ((toplevel_declarations[classes.name] = std::move(std::make_unique<DClassWrapper>((classes, this)))), ...);
             }, classes);
 
-            std::apply([this] (auto &&...namespaces) {
-                ((toplevel_declarations[namespaces.name].reset(new DNamespaceWrapper(namespaces))), ...);
+            std::apply([this] (auto &&...nmspcs) {
+                ((toplevel_declarations[nmspcs.name] = rosewood::makeNamespace(nmspcs, this)), ...);
             }, namespaces);
 
             init_toplevel_lookups<tIdx+1>();
@@ -71,7 +70,7 @@ private:
 
     // topleveltypes_t topleveltypes;
     // when an entity is searched for by it's full name than nothing beats a hash table
-    std::unordered_map<std::string_view, std::unique_ptr<const rosewood::DMetaDecl>> toplevel_declarations;
+    std::unordered_map<std::string_view, std::unique_ptr<rosewood::Declaration>> toplevel_declarations;
 };
 
 // template <typename ...WrappedTypes>

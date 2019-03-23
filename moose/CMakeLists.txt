@@ -19,8 +19,8 @@ add_library(moose)
 target_sources(moose PRIVATE
     ${FLEX_scanner_OUTPUTS}
     ${BISON_parser_OUTPUTS}
-    scanner.l
-    parser.y
+    # scanner.l
+    # parser.y
 
     Lexer.cpp
     Lexer.h

@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <rosewood/runtime.hpp>
 
 namespace moose::ast {
 
@@ -14,13 +15,21 @@ namespace moose::ast {
         virtual ~Stmt() = 0;
     };
 
+    struct TypeRef {
+        const rosewood::TypeDeclaration* td;
+    };
+
     struct ValueStmt : public Stmt {};
 
-    struct Expr : public ValueStmt {};
+    struct Expr : public ValueStmt {
+        virtual bool typecheck() = 0;
+    };
 
     struct StringLiteral : public Expr {
         StringLiteral(std::string_view sv)
             :value(sv) {}
+
+        bool typecheck() final { return true; }
 
         std::string value;
     };
@@ -29,12 +38,16 @@ namespace moose::ast {
         IntegralLiteral(std::int64_t v)
             :value(v) {}
 
+        bool typecheck() final { return true; }
+
         std::int64_t value;
     };
 
     struct FloatingPLiteral : public Expr {
         FloatingPLiteral(double v)
             :value(v) {}
+
+        bool typecheck() final { return true; }
 
         double value;
     };
@@ -45,6 +58,8 @@ namespace moose::ast {
               lhs(lhs),
               rhs(rhs) {}
 
+        bool typecheck() final { return false; } // 1: determine type of lhs; 2: is rhs addable to it?
+
         std::string op;
         std::shared_ptr<Expr> lhs;
         std::shared_ptr<Expr> rhs;
@@ -52,10 +67,23 @@ namespace moose::ast {
 
     struct CallExpr : public Expr {
 
+        bool typecheck() final { return false; }
         // TDOODODO
     };
 
-    struct ParameterList {
+    struct VarDecl : public Expr {
+        template <typename iter_t>
+        VarDecl(std::string_view nm, TypeRef tp, iter_t fparam, iter_t lparam)
+            : name(nm),
+              type(tp.td),
+              params(fparam, lparam) {
 
+        }
+
+        bool typecheck() final;
+        std::string name;
+        const rosewood::TypeDeclaration *type;
+        std::vector<std::shared_ptr<Expr>> params;
     };
+
 }
