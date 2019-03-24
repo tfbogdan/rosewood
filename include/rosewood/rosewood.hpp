@@ -127,8 +127,8 @@ namespace rosewood {
         using impl_t = FunctionParameter<ArgType>;
         using type_t = FunctionParameter<const ArgType>;
 
-        constexpr type_t(std::string_view argName, bool hasDefaultValue) noexcept
-            :impl_t(argName, hasDefaultValue) {}
+        constexpr type_t(std::string_view argName, bool hasDefaultValue, int pos) noexcept
+            :impl_t(argName, hasDefaultValue, pos) {}
     };
 
 #endif // _MSC_VER

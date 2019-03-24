@@ -228,7 +228,7 @@ namespace mc {
                 ++paramIdx;
             }
         }
-        std::string_view noexceptness = isKnownNoExcept(method) ? (noExcept ? "noexcept": "noexcept(false)") : "";
+        std::string_view noexceptness = isKnownNoExcept(method) ? (noExcept ? " noexcept": " noexcept(false)") : "";
         sstream << ")";
         sstream << fmt::format("{}{}",
                                functionPrototype->isConst() ? " const" : "",
@@ -454,7 +454,7 @@ namespace mc {
         int baseIndex(0);
         for (const auto &base: Record->bases()) {
             if (base.getAccessSpecifier() == clang::AccessSpecifier::AS_public) {
-                ownScope.putline("{} {}", baseIndex == 0 ? " ": ",", base.getType().getAsString(printingPolicy));
+                ownScope.putline("{} {}", baseIndex == 0 ? " ": ",", base.getType().getCanonicalType().getAsString(printingPolicy));
             }
             ++baseIndex;
         }
