@@ -4,10 +4,7 @@ project(rosewood VERSION 0.0.2 LANGUAGES CXX)
 find_package(Clang REQUIRED CONFIG)
 find_package(fmt REQUIRED)
 find_package(nlohmann_json REQUIRED)
-
 enable_testing()
-
-include(${CMAKE_BINARY_DIR}/conan.cmake)
 
 include(cmake/rosewood.cmake)
 add_subdirectory(lib)
