@@ -71,7 +71,7 @@ const constexpr std::string_view g_Decl_Prefix = "__metal__Decl__";
 
         /* end of maps */
         const clang::PrintingPolicy& printingPolicy;
-        std::string outJson;
+        // std::string outJson;
     };
 }
 

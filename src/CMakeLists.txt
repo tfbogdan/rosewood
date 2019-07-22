@@ -24,7 +24,7 @@ target_link_libraries(rwc
     LLVMCore # Support
     LLVMSupport
     fmt::fmt
-    nlohmann_json::nlohmann_json
+    # nlohmann_json
 )
 
 if (NOT WIN32)
