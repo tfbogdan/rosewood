@@ -5,21 +5,21 @@
 
 #include <fstream>
 #include <iomanip>
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 
 namespace mc {
 
 IdentifierRepository::IdentifierRepository(const fs::path &source) {
-    nlohmann::json json;
-    json.parse(std::ifstream(source));
+    // nlohmann::json json;
+    // json.parse(std::ifstream(source));
     // TDO definedIdents = json["defined"];
 }
 
     void IdentifierRepository::save(const fs::path &file) {
-        nlohmann::json json;
-        json["defines"] = definedIdents;
-        json["expects"] = externalIdents;
-        std::ofstream(file) << std::setw(4) << json;
+        // nlohmann::json json;
+        // json["defines"] = definedIdents;
+        // json["expects"] = externalIdents;
+        // std::ofstream(file) << std::setw(4) << json;
     }
 
     bool IdentifierRepository::isDefined([[maybe_unused]] const std::string &identifier) const {

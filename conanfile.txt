@@ -1,7 +1,0 @@
-[requires]
-fmt/5.2.1@bincrafters/stable
-glm/0.9.9.1@g-truc/stable
-jsonformoderncpp/3.3.0@vthiery/stable
-gtest/1.8.1@bincrafters/stable
-[generators]
-cmake

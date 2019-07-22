@@ -11,7 +11,6 @@
 
 #include <fstream>
 #include <vector>
-#include <nlohmann/json.hpp>
 #include <fmt/ostream.h>
 
 inline std::ostream& operator<< (std::ostream& os, const llvm::StringRef& v) {
