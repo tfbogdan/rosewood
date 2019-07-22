@@ -14,11 +14,17 @@ add_executable(rwc
 target_link_libraries(rwc
     PRIVATE
     clangTooling
+    clangAST
+    clangBasic
+    clangFrontend
+    clangSerialization
+    clangSema
+    LLVM
     LLVMOption # Support
     LLVMCore # Support
     LLVMSupport
-    CONAN_PKG::fmt
-    CONAN_PKG::jsonformoderncpp
+    fmt::fmt
+    nlohmann_json::nlohmann_json
 )
 
 if (NOT WIN32)
