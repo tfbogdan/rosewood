@@ -9,18 +9,12 @@
 #include <clang/Basic/OperatorKinds.h>
 
 #include <iostream>
-#include <range/v3/range.hpp>
-#include <range/v3/view.hpp>
 
 #pragma warning(push, 0)
 #pragma warning(pop)
 
 extern llvm::cl::opt<std::string> mcOutput;
 extern llvm::cl::opt<std::string> mcJsonOutput;
-
-namespace std {
-    namespace view = ranges::cpp20::view;
-}
 
 namespace mc {
     namespace fs = std::experimental::filesystem;

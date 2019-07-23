@@ -17,10 +17,6 @@ target_include_directories(rwruntime
 
 target_compile_features(rwruntime PUBLIC cxx_std_17)
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-install(DIRECTORY ${CLANG_CMAKE_DIR}/../../clang/${LLVM_PACKAGE_VERSION}/include DESTINATION lib/clang/${LLVM_PACKAGE_VERSION}/include)
-file(COPY ${CLANG_CMAKE_DIR}/../../clang/${LLVM_PACKAGE_VERSION}/include DESTINATION clang/${LLVM_PACKAGE_VERSION})
-endif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
 install(TARGETS rwruntime EXPORT rosewood-exports
     ARCHIVE DESTINATION lib)

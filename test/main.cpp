@@ -107,8 +107,6 @@ TEST(mc, runtime_searches) {
     EXPECT_TRUE(plainClss->getDeclaration("intField")->asField() != nullptr);
     auto intField = plainClss->getDeclaration("intField")->asField();
 
-    // auto aMethod = aMethodSet->getMethods()[0];
-
     int aMethodRes;
     int aMethodArg = 12;
     void *aMethodArgs[] = {&aMethodArg};

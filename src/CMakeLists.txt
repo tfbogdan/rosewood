@@ -21,7 +21,7 @@ target_link_libraries(rwc
     clangSema
 
     fmt::fmt
-    nlohmann_json::nlohmann_json
+#    nlohmann_json::nlohmann_json
 )
 
 if (NOT WIN32)
