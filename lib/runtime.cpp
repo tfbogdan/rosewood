@@ -88,5 +88,11 @@ namespace rosewood {
         return this;
     }
 
+    const DField *DField::asField() const noexcept {
+        return this;
+    }
 
+    const DMethod *DMethod::asMethod() const noexcept {
+        return this;
+    }
 }

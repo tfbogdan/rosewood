@@ -29,6 +29,9 @@ int main(int argc, const char **argv) {
     printInvokation(argc, argv);
 
     clang::tooling::CommonOptionsParser OptionsParser(argc, argv, mcOptionsCategory);
+    // right now json file generation is not implemented but the interface exists so just generate a dummy file
+    std::ofstream jsonFile(mcJsonOutput);
+    jsonFile << "dummy\n";
 
     clang::tooling::ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
 

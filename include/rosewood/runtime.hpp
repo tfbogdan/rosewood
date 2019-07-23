@@ -252,6 +252,7 @@ namespace rosewood {
         const DMethod *getNextOverload() const noexcept;
 
         void pushOverload(std::unique_ptr<DMethod> &&next);
+        const DMethod *asMethod() const noexcept final;
     private:
         std::unique_ptr<DMethod> nextOverload = nullptr;
     };
@@ -319,6 +320,8 @@ namespace rosewood {
         virtual ~DField() = 0;
         virtual void assign_copy(void* o, void* a) const = 0;
         virtual void assign_move(void* o, void* a) const = 0;
+
+        const DField *asField() const noexcept final;
     };
 
     template <typename Descriptor>
@@ -390,46 +393,14 @@ namespace rosewood {
             return descriptor::name;
         }
 
-        /*inline const DMethod *findMethod(std::string_view name) const noexcept final {
-            auto res = method_map.find(name);
-            if (res != method_map.end()) {
-                return res->second[0].get();
-            }
-
-            return nullptr;
-        }
-
-        inline const DClass *findChildClass(std::string_view name) const noexcept(false) final {
-            return nullptr; // classes.element_map.at(name);
-        }
-
-        inline const DEnum *findChildEnum(std::string_view name) const noexcept(false) final {
-            return nullptr; // enums.element_map.at(name);
-        }
-
-        inline const DField *findField(std::string_view name) const noexcept(false) final {
-            auto res = field_map.find(name);
-            if (res != field_map.end()) {
+        inline const Declaration *getDeclaration(std::string_view name) const noexcept final {
+            if (auto res = declarations.find(name); res != declarations.end()) {
                 return res->second.get();
             }
-
             return nullptr;
-        }*/
-
-        inline const Declaration *getDeclaration(std::string_view name) const noexcept final {
-            return nullptr; // TDO DUUUUUH
         }
 
     private:
-        // using enum_range = detail::range_model<typename MetaClass::enums, DEnum, DEnumWrapper>;
-        // static constexpr enum_range enums = {};
-
-        // template<typename T>
-        // using disambiguator = DClassWrapper<T>;
-
-        // using class_range = detail::range_model<typename MetaClass::classes, DClass, disambiguator>;
-        // static constexpr class_range classes = {};
-
         void initMethods() {
             std::unordered_map<std::string_view, std::unique_ptr<DMethod>> all_methods;
             std::apply([&all_methods, this](auto &&...mts) {

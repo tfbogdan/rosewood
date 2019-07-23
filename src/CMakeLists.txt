@@ -19,21 +19,19 @@ target_link_libraries(rwc
     clangFrontend
     clangSerialization
     clangSema
-    LLVM
-    LLVMOption # Support
-    LLVMCore # Support
-    LLVMSupport
+
     fmt::fmt
-    # nlohmann_json
+    nlohmann_json::nlohmann_json
 )
 
 if (NOT WIN32)
 	target_link_libraries(rwc PRIVATE stdc++fs)
 endif(NOT WIN32)
 
-list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
-include (AddLLVM)
-llvm_update_compile_flags(rwc)
+#list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
+#include (AddLLVM)
+#llvm_update_compile_flags(rwc)
+llvm_config(rwc USE_SHARED Option Core Support)
 
 target_include_directories(rwc PRIVATE ${CLANG_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 target_compile_options(rwc PRIVATE -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
