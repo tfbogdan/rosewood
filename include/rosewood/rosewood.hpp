@@ -36,6 +36,30 @@ namespace rosewood {
         using type = typename arguments_wrapper<wrapping_type, std::tuple<TupleTypes..., wrapping_type<Head>>, Types...>::type;
     };
 
+    template <typename ...Tuples>
+    struct concatenate_tuples;
+
+    template <>
+    struct concatenate_tuples<> {
+        using type = std::tuple<>;
+    };
+
+    template <typename ...Types>
+    struct concatenate_tuples<std::tuple<Types...>> {
+        using type = std::tuple<Types...>;
+    };
+
+    template <typename ...ConcatenatedTypes, typename ...NextTypes>
+    struct concatenate_tuples<std::tuple<ConcatenatedTypes...>, std::tuple<NextTypes...>> {
+        using type = std::tuple<ConcatenatedTypes..., NextTypes...>;
+    };
+
+    template <typename ...ConcatenatedTypes, typename ...NextTypes, typename...moreTuples>
+    struct concatenate_tuples<std::tuple<ConcatenatedTypes...>, std::tuple<NextTypes...>, moreTuples...> {
+        using type = typename concatenate_tuples<std::tuple<ConcatenatedTypes..., NextTypes...>, moreTuples...>::type;
+    };
+
+
     template<typename T>
     struct meta : public nil_t {};
 

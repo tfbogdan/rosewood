@@ -9,12 +9,18 @@
 #include <clang/Basic/OperatorKinds.h>
 
 #include <iostream>
+#include <range/v3/range.hpp>
+#include <range/v3/view.hpp>
 
 #pragma warning(push, 0)
 #pragma warning(pop)
 
 extern llvm::cl::opt<std::string> mcOutput;
 extern llvm::cl::opt<std::string> mcJsonOutput;
+
+namespace std {
+    namespace view = ranges::cpp20::view;
+}
 
 namespace mc {
     namespace fs = std::experimental::filesystem;
@@ -55,6 +61,30 @@ namespace mc {
     }
 
     template <typename declRangeT>
+    void put_decl_range(scope where, const declRangeT &range, std::string_view separator = ",\n") {
+        const std::size_t numElements = std::size(range);
+        std::size_t idx(0);
+
+        for(const auto& item: range) {
+            where.indent();
+
+            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
+                where.rawput(item);
+            } else {
+                auto itemName = item->getNameAsString();
+                where.rawput("meta_{}", itemName);
+            }
+
+            if (idx < (numElements - 1)) {
+                where.rawput(separator);
+            }
+
+            ++idx;
+        }
+
+    }
+
+    template <typename declRangeT>
     void wrap_range_in_tuple(std::string_view withName, scope where, const declRangeT &range) {
         const std::size_t numElements = std::size(range);
         if (numElements == 0) {
@@ -69,7 +99,7 @@ namespace mc {
         for(const auto& item: range) {
             initScope.indent();
 
-            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value) {
+            if constexpr (std::is_same<typename declRangeT::value_type, std::string>::value || std::is_same<typename declRangeT::value_type, std::string_view>::value) {
                 initScope.rawput(item);
             } else {
                 auto itemName = item->getNameAsString();
@@ -144,6 +174,13 @@ namespace mc {
         wrap_range_in_tuple("namespaces", module_scope.inner, exportedNamespaces);
         wrap_range_in_tuple("enums", module_scope.inner, exportedEnums);
         wrap_range_in_tuple("classes", module_scope.inner, exportedClasses);
+        // and another range to rule them all
+        std::vector<std::string_view> all_decls;
+        all_decls.insert(all_decls.end(), exportedNamespaces.begin(), exportedNamespaces.end());
+        all_decls.insert(all_decls.end(), exportedEnums.begin(), exportedEnums.end());
+        all_decls.insert(all_decls.end(), exportedClasses.begin(), exportedClasses.end());
+
+        wrap_range_in_tuple("declarations", module_scope.inner, all_decls);
     }
 
     descriptor_scope ReflectionDataGenerator::exportDeclaration(const clang::Decl *Decl, descriptor_scope &where) {
@@ -477,9 +514,13 @@ namespace mc {
             descriptornames["enums"].emplace(fmt::format("meta_{}", exportedScope.name));
         }
 
+        std::vector<std::string_view> all_decls;
         for(const auto& [rangeName, range]: descriptornames) {
             wrap_range_in_tuple(rangeName, ownScope.inner, range);
+            all_decls.insert(all_decls.end(), range.begin(), range.end());
+
         }
+        wrap_range_in_tuple("declarations", ownScope.inner, all_decls);
 
         exportedMetaTypes.emplace_back(std::tuple(clang::QualType(Record->getTypeForDecl(),0).getAsString(printingPolicy), ownScope.qualifiedName));
         return ownScope;
@@ -555,6 +596,14 @@ namespace mc {
         wrap_range_in_tuple("namespaces", ownScope.inner, exportedNamespaces);
         wrap_range_in_tuple("enums", ownScope.inner, exportedEnums);
         wrap_range_in_tuple("classes", ownScope.inner, exportedClasses);
+
+
+        std::vector<std::string_view> all_decls;
+        all_decls.insert(all_decls.end(), exportedNamespaces.begin(), exportedNamespaces.end());
+        all_decls.insert(all_decls.end(), exportedEnums.begin(), exportedEnums.end());
+        all_decls.insert(all_decls.end(), exportedClasses.begin(), exportedClasses.end());
+
+        wrap_range_in_tuple("declarations", ownScope.inner, all_decls);
 
         return ownScope;
     }

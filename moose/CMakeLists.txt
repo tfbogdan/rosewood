@@ -37,5 +37,5 @@ target_sources(moose PRIVATE
 
 target_include_directories(moose PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(moose PUBLIC ${PROJECT_SOURCE_DIR})
-target_link_libraries(moose PUBLIC CONAN_PKG::fmt rwruntime)
+target_link_libraries(moose PUBLIC fmt::fmt rwruntime)
 target_compile_features(moose PUBLIC cxx_std_17)

@@ -68,37 +68,44 @@ TEST(mc, static_class) {
 
 TEST(mc, runtime_module) {
     constexpr rosewood::meta_BasicDefinitions sbd;
-    rosewood::DNamespaceWrapper basicDefs(sbd);
+    rosewood::DNamespaceWrapper basicDefs(sbd, nullptr);
 
-    EXPECT_EQ(basicDefs.getNamespaces()[0]->getName(), "basic");
-    EXPECT_EQ(basicDefs.getClasses().size(), 0);
-    EXPECT_EQ(basicDefs.getEnums().size(), 0);
+//    EXPECT_EQ(basicDefs.getNamespaces()[0]->getName(), "basic");
+//    EXPECT_EQ(basicDefs.getClasses().size(), 0);
+//    EXPECT_EQ(basicDefs.getEnums().size(), 0);
+    EXPECT_FALSE(basicDefs.getDeclaration("basic")->asNamespace() == nullptr);
 
-    const rosewood::DNamespace *dBasic = basicDefs.getNamespaces()[0];
+    const rosewood::DNamespace *dBasic = basicDefs.getDeclaration("basic")->asNamespace();
 
-    EXPECT_EQ(dBasic->getNamespaces().size(), 0);
-    EXPECT_EQ(dBasic->getEnums().size(), 2);
-    EXPECT_EQ(dBasic->getClasses().size(), 2);
+//    EXPECT_EQ(dBasic->getNamespaces().size(), 0);
+//    EXPECT_EQ(dBasic->getEnums().size(), 2);
+//    EXPECT_EQ(dBasic->getClasses().size(), 2);
 }
 
 TEST(mc, runtime_namespace) {
     constexpr rosewood::meta_BasicDefinitions rbd;
-    rosewood::DNamespaceWrapper basicDefs(rbd);
+    rosewood::DNamespaceWrapper basicDefs(rbd, nullptr);
 
-    const rosewood::DNamespace *dBasic = basicDefs.getNamespaces()[0];
+    const rosewood::DNamespace *dBasic = basicDefs.getDeclaration("basic")->asNamespace();
 
-    EXPECT_THROW(dBasic->findChildNamespace("unthinkable"), std::out_of_range);
-    EXPECT_NO_THROW(basicDefs.findChildNamespace("basic"));
-    EXPECT_EQ(basicDefs.findChildNamespace("basic"), dBasic);
+    EXPECT_EQ(dBasic->getDeclaration("unthinkable"), nullptr);
 }
 
 TEST(mc, runtime_searches) {
     constexpr rosewood::meta_BasicDefinitions rbd;
-    rosewood::DNamespaceWrapper basicDefs(rbd);
+    rosewood::DNamespaceWrapper basicDefs(rbd, nullptr);
 
-    EXPECT_NO_THROW(basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger"));
-    auto aMethod = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findMethod("doubleInteger");
-    auto intField = basicDefs.findChildNamespace("basic")->findChildClass("PlainClass")->findField("intField");
+    EXPECT_TRUE(basicDefs.getDeclaration("basic")->asNamespace() != nullptr);
+    auto basicNmpsc = basicDefs.getDeclaration("basic")->asNamespace();
+
+    EXPECT_TRUE(basicNmpsc->getDeclaration("PlainClass")->asClass() != nullptr);
+    auto plainClss = basicNmpsc->getDeclaration("PlainClass")->asClass();
+
+    EXPECT_TRUE(plainClss->getDeclaration("doubleInteger")->asMethod() != nullptr);
+    auto dblIntgrMtd = plainClss->getDeclaration("doubleInteger")->asMethod();
+
+    EXPECT_TRUE(plainClss->getDeclaration("intField")->asField() != nullptr);
+    auto intField = plainClss->getDeclaration("intField")->asField();
 
     // auto aMethod = aMethodSet->getMethods()[0];
 
@@ -109,23 +116,25 @@ TEST(mc, runtime_searches) {
 
     int testValue = 1337;
     intField->assign_copy(&plainClass, &testValue);
-    aMethod->call(&plainClass, &aMethodRes, aMethodArgs);
+    dblIntgrMtd->call(&plainClass, &aMethodRes, aMethodArgs);
     EXPECT_EQ(plainClass.intField, testValue);
 
     EXPECT_EQ(aMethodRes, plainClass.doubleInteger(aMethodArg));
-    EXPECT_NO_THROW(aMethod->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs));
+    EXPECT_NO_THROW(dblIntgrMtd->call(&static_cast<const basic::PlainClass&>(plainClass), &aMethodRes, aMethodArgs));
 }
 
 TEST(mc, string_wrap) {
     constexpr rosewood::meta_TemplateDeclarations tds;
-    rosewood::DNamespaceWrapper module(tds);
+    rosewood::DNamespaceWrapper module(tds, nullptr);
 
-    auto tdNamespace = module.findChildNamespace("td");
-    auto strWrapper = tdNamespace->findChildClass("WrappedString");
+    auto tdNamespace = module.getDeclaration("td")->asNamespace();
+
+    auto strWrapper = tdNamespace->getDeclaration("WrappedString")->asClass();
 
     const std::string testString = "Hello World!";
     char *res;
-    auto cStr = strWrapper->findMethod("c_str");
+    auto cStr = strWrapper->getDeclaration("c_str")->asMethod();
+
     cStr->call(&testString, &res, nullptr);
     EXPECT_EQ(testString, res);
 }

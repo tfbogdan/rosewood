@@ -122,6 +122,8 @@ namespace rosewood {
     class DEnum;
     class DEnumerator : public Declaration {
     public:
+        using Declaration::Declaration;
+
         virtual ~DEnumerator() = 0;
         virtual long long getValue() const noexcept = 0;
     };
@@ -129,7 +131,7 @@ namespace rosewood {
     template <typename Descriptor>
     class DEnumeratorWrapper : public DEnumerator {
     public:
-        DEnumeratorWrapper(const Descriptor &d) : descriptor(d) {}
+        DEnumeratorWrapper(const Descriptor &d, const DeclarationContext *parent) : DEnumerator(parent), descriptor(d) {}
 
         inline virtual std::string_view getName() const noexcept final {
             return descriptor.name;
@@ -142,13 +144,12 @@ namespace rosewood {
         const Descriptor descriptor;
     };
 
-    class DEnum : public TypeDeclaration {
+    class DEnum : public TypeDeclaration, public DeclarationContext {
     public:
         using TypeDeclaration::TypeDeclaration;
 
         virtual ~DEnum() = 0;
         virtual const DEnum *asEnum() const noexcept final;
-        virtual std::vector<const DEnumerator*> getEnumerators() const noexcept = 0;
     private:
     };
 
@@ -158,7 +159,12 @@ namespace rosewood {
     public:
         DEnumWrapper(const MetaEnum &me, const DeclarationContext* parent)
             : DEnum(parent) {
-            initEnumeratorsVector();
+            enumerators.reserve(MetaEnum::enumerators.size());
+            for (const auto &en: MetaEnum::enumerators) {
+                enumerators.emplace_back(
+                    std::make_unique<DEnumeratorWrapper<typename descriptor::enumerator_type>>(en, this)
+                );
+            }
         }
 
         inline virtual ~DEnumWrapper() = default;
@@ -167,22 +173,18 @@ namespace rosewood {
             return descriptor::name;
         }
 
-        inline virtual std::vector<const DEnumerator*> getEnumerators() const noexcept final {
-            std::vector<const DEnumerator*> result; result.reserve(enumerators.size());
-            for (const auto &en : enumerators) {
-                result.emplace_back(&en);
+        const Declaration *getDeclaration(std::string_view name) const noexcept final {
+            auto res = std::find_if(enumerators.begin(), enumerators.end(), [name, this](const std::unique_ptr<DEnumerator> &enumerator){
+                return enumerator->getName() == name;
+            });
+            if (res != enumerators.end()) {
+                return res->get();
             }
-            return result;
+            return nullptr;
         }
 
     private:
-        void initEnumeratorsVector() {
-            enumerators.reserve(MetaEnum::enumerators.size());
-            for (const auto &en: MetaEnum::enumerators) {
-                enumerators.emplace_back(en);
-            }
-        }
-        std::vector<DEnumeratorWrapper<typename descriptor::enumerator_type>> enumerators;
+        std::vector<std::unique_ptr<DEnumerator>> enumerators;
     };
 
     template <typename T>
@@ -488,6 +490,7 @@ namespace rosewood {
             : DNamespace(parent) {
             initClasses();
             initNamespaces();
+            initEnums();
         }
 
         inline virtual ~DNamespaceWrapper() = default;
