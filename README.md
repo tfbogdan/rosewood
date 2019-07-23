@@ -1,4 +1,4 @@
-# mc [![Build Status](https://travis-ci.org/tfbogdan/rosewood.svg?branch=master)](https://travis-ci.org/tfbogdan/rosewood)[![codecov](https://codecov.io/gh/tfbogdan/rosewood/branch/master/graph/badge.svg)](https://codecov.io/gh/tfbogdan/rosewood)
+# mc [![Copr build status](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/)(https://codecov.io/gh/tfbogdan/rosewood)
 A no nonsense approach to C++ reflection. Aims to provide the means of accessing type information at compile and run time. Achieves that by means of a Clang tool that generates a compile time model of the code it parses. Tries to stay out of its users way by not inventing new syntax or high level concepts such as signals and slots but enables the (more accessible) possibility of higher level constructs in user code.
 
 ## Note
@@ -55,7 +55,7 @@ superJinx: 100
 
 ## Getting started
 
-Please check the releases page for binary distributions. If you can't find any suitable you can always compile from source as long as you have a C++17 compiler and the following prerequisites: 
+Please check the releases page for binary distributions. If you can't find any suitable you can always compile from source as long as you have a C++17 compiler and the following prerequisites:
 
 - A recent (7+) version of the clang libraries, and I mean the C++ libraries not the C wrapper. You'll be able to find precompiled binaries for a wide range of platforms at the [LLVM Release page](http://releases.llvm.org/download.html#7.0.0). If you're not on one of the targeted platforms then don't despair as it's quite easy to compile LLVM and Clang from source. Follow the [LLVM Getting Started guide](https://llvm.org/docs/GettingStarted.html) and you'll be up and running in a heartbeat. You'll find the trickyest part of building them is having the patience for the build to be over and (be warned!) if compiling debug binaries finding the disk space necessary.
 - Conan, as the rest of dependencies are fortunately available in conan center. Installing conan is as simple as `pip install conan`.
