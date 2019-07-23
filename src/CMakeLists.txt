@@ -42,6 +42,6 @@ install(
     TARGETS rwc
     EXPORT rosewood-exports
     RUNTIME
-        DESTINATION bin
+        DESTINATION ${BIN_INSTALL_DIR}
 )
 

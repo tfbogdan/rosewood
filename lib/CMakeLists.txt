@@ -19,9 +19,9 @@ target_compile_features(rwruntime PUBLIC cxx_std_17)
 
 
 install(TARGETS rwruntime EXPORT rosewood-exports
-    ARCHIVE DESTINATION lib)
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
 
 install(
     DIRECTORY ${PROJECT_SOURCE_DIR}/include/rosewood
-    DESTINATION include
+    DESTINATION ${INCLUDE_INSTALL_DIR}
 )

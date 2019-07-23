@@ -14,9 +14,12 @@ BuildRequires: clang-devel
 BuildRequires: llvm-devel
 BuildRequires: gtest-devel
 BuildRequires: fmt-devel
-BuildRequires: ninja-build
+BuildRequires: make
 BuildRequires: bison
 BuildRequires: flex
+
+Requires: llvm-libs
+Requires: clang-libs
 
 %description
 No nonsense C++ reflection framework built on clang tooling
@@ -24,8 +27,28 @@ No nonsense C++ reflection framework built on clang tooling
 %prep
 {{{ git_setup_macro }}}
 
-%changelog
-{{{ git_changelog }}}
 
 %build
-cmake . -GNinja && ninja
+
+%cmake . -DCMAKE_BUILD_TYPE=Release -DBIN_INSTALL_DIR:PATH=%_bindir -DCMAKE_INSTALL_DIR:PATH=%_libdir/cmake
+%make_build
+
+%check
+ctest -V %{?_smp_mflags}
+
+%install
+# cmake --build . --target install
+%make_install
+
+%files
+%dir %_includedir/rosewood
+%_includedir/rosewood/*.hpp
+
+%dir %_libdir/cmake/rosewood
+%_libdir/cmake/rosewood/*.cmake
+
+%_bindir/rwc
+%_libdir/librwruntime.a
+
+%changelog
+{{{ git_changelog }}}
