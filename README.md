@@ -1,4 +1,9 @@
-# mc [![Copr build status](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/)(https://codecov.io/gh/tfbogdan/rosewood)
+# mc
+
+| Build name | Status |
+|------------|:------:|
+|Copr | [![Copr build status](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/tfbogdan/rosewood/package/rosewood/) |
+
 A no nonsense approach to C++ reflection. Aims to provide the means of accessing type information at compile and run time. Achieves that by means of a Clang tool that generates a compile time model of the code it parses. Tries to stay out of its users way by not inventing new syntax or high level concepts such as signals and slots but enables the (more accessible) possibility of higher level constructs in user code.
 
 ## Note
