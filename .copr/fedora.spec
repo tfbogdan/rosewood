@@ -16,8 +16,6 @@ No nonsense C++ reflection framework built on clang tooling
 
 %changelog
 {{{ git_changelog }}}
-EOF
-git init
 
 %build
 cmake . -GNinja && ninja
