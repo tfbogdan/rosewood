@@ -20,3 +20,23 @@ build-ubuntu-19.04:
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
+
+build-openususe-tumbleweed:
+  stage: build
+  image: registry.gitlab.com/tfbogdan/rosewood/opensuse/tumbleweed
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build .
+    - cmake --build . --target test
+
+build-archlinux:
+  stage: build
+  image: registry.gitlab.com/tfbogdan/rosewood/archlinux
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build .
+    - cmake --build . --target test

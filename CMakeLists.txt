@@ -4,7 +4,7 @@ project(
     rosewood
     VERSION 0.1.0
     DESCRIPTION "C++ Reflection framework"
-    HOMEPAGE_URL https://github.com/tfbogdan/rosewood
+    HOMEPAGE_URL https://gitlab.com/tfbogdan/rosewood/
     LANGUAGES CXX
 )
 
