@@ -19,42 +19,97 @@ update-fedora30-image:
     - docker push $IMAGE_NAME:$CI_COMMIT_SHA
     - docker push $IMAGE_NAME:latest
 
+update-archlinux-image:
+  stage: update-images
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - docker pull $IMAGE_NAME:latest || true
+    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/archlinux
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
+    - docker push $IMAGE_NAME:latest
+
+update-ubuntu-image:
+  stage: update-images
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - docker pull $IMAGE_NAME:latest || true
+    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/ubuntu-19.04
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
+    - docker push $IMAGE_NAME:latest
+
+update-tumbleweed-image:
+  stage: update-images
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - docker pull $IMAGE_NAME:latest || true
+    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/opensuse/tumbleweed
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
+    - docker push $IMAGE_NAME:latest
+
 build-fedora30:
   stage: build
-  image: registry.gitlab.com/tfbogdan/rosewood/fedora30
+  image: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
   script:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
+    - gcovr ..
 
 build-ubuntu-19.04:
   stage: build
-  image: registry.gitlab.com/tfbogdan/rosewood/ubuntu-19.04
+  image: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
   script:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
+    - gcovr ..
 
 build-openususe-tumbleweed:
   stage: build
-  image: registry.gitlab.com/tfbogdan/rosewood/opensuse/tumbleweed
+  image: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
   script:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
+    - gcovr ..
 
 build-archlinux:
   stage: build
-  image: registry.gitlab.com/tfbogdan/rosewood/archlinux
+  image: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
   script:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
+    - gcovr ..
