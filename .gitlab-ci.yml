@@ -11,8 +11,9 @@ update-fedora30-image:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_DRIVER: overlay2
     IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora/30/$CI_COMMIT_REF_NAME
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker pull $IMAGE_NAME:latest || true
     - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/fedora30
     - docker push $IMAGE_NAME:$CI_COMMIT_SHA
