@@ -2,7 +2,7 @@ stages:
   - update-images
   - build
 
-update-fedora30-image:
+.template: &prepare-build-image
   stage: update-images
   image: docker:stable
   services:
@@ -10,106 +10,61 @@ update-fedora30-image:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_DRIVER: overlay2
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
   before_script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
     - docker pull $IMAGE_NAME:latest || true
-    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/fedora30
+    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest $BUILD_CONTEXT_DIR
     - docker push $IMAGE_NAME:$CI_COMMIT_SHA
     - docker push $IMAGE_NAME:latest
+
+.template: &ctc
+  stage: build
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build .
+    - cmake --build . --target test
+    - gcovr -r ..
+
+
+update-fedora30-image:
+  <<: *prepare-build-image
+  variables:
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
+    BUILD_CONTEXT_DIR: images/fedora30
 
 update-archlinux-image:
-  stage: update-images
-  image: docker:stable
-  services:
-    - docker:dind
+  <<: *prepare-build-image
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
     IMAGE_NAME: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
-  before_script:
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-  script:
-    - docker pull $IMAGE_NAME:latest || true
-    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/archlinux
-    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
-    - docker push $IMAGE_NAME:latest
+    BUILD_CONTEXT_DIR: images/archlinux
 
 update-ubuntu-image:
-  stage: update-images
-  image: docker:stable
-  services:
-    - docker:dind
+  <<: *prepare-build-image
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
     IMAGE_NAME: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
-  before_script:
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-  script:
-    - docker pull $IMAGE_NAME:latest || true
-    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/ubuntu-19.04
-    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
-    - docker push $IMAGE_NAME:latest
+    BUILD_CONTEXT_DIR: images/ubuntu-19.04
 
 update-tumbleweed-image:
-  stage: update-images
-  image: docker:stable
-  services:
-    - docker:dind
+  <<: *prepare-build-image
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
     IMAGE_NAME: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
-  before_script:
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-  script:
-    - docker pull $IMAGE_NAME:latest || true
-    - docker build --cache-from $IMAGE_NAME:latest -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest images/opensuse/tumbleweed
-    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
-    - docker push $IMAGE_NAME:latest
+    BUILD_CONTEXT_DIR: images/opensuse/tumbleweed
 
 build-fedora30:
-  stage: build
+  <<: *ctc
   image: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
-  script:
-    - mkdir build
-    - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - cmake --build .
-    - cmake --build . --target test
-    - gcovr -r ..
 
 build-ubuntu-19.04:
-  stage: build
+  <<: *ctc
   image: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
-  script:
-    - mkdir build
-    - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - cmake --build .
-    - cmake --build . --target test
-    - gcovr -r ..
 
 build-openususe-tumbleweed:
-  stage: build
+  <<: *ctc
   image: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
-  script:
-    - mkdir build
-    - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - cmake --build .
-    - cmake --build . --target test
-    - gcovr -r ..
 
 build-archlinux:
-  stage: build
+  <<: *ctc
   image: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
-  script:
-    - mkdir build
-    - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - cmake --build .
-    - cmake --build . --target test
-    - gcovr -r ..
