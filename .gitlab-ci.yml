@@ -1,0 +1,22 @@
+stages:
+  - build
+
+build-fedora30:
+  stage: build
+  image: registry.gitlab.com/tfbogdan/rosewood/fedora30
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build .
+    - cmake --build . --target=test
+
+build-ubuntu-19.04:
+  stage: build
+  image: registry.gitlab.com/tfbogdan/rosewood/ubuntu-19.04
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build .
+    - cmake --build . --target=test
