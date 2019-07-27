@@ -9,7 +9,7 @@ build-fedora30:
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
-    - cmake --build . --target=test
+    - cmake --build . --target test
 
 build-ubuntu-19.04:
   stage: build
@@ -19,4 +19,4 @@ build-ubuntu-19.04:
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
-    - cmake --build . --target=test
+    - cmake --build . --target test
