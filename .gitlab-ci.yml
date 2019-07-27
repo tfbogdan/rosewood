@@ -10,7 +10,7 @@ update-fedora30-image:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_DRIVER: overlay2
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora/30/$CI_COMMIT_REF_NAME
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
   before_script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
