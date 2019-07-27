@@ -79,7 +79,7 @@ build-fedora30:
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
-    - gcovr ..
+    - gcovr -r ..
 
 build-ubuntu-19.04:
   stage: build
@@ -90,7 +90,7 @@ build-ubuntu-19.04:
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
-    - gcovr ..
+    - gcovr -r ..
 
 build-openususe-tumbleweed:
   stage: build
@@ -101,7 +101,7 @@ build-openususe-tumbleweed:
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
-    - gcovr ..
+    - gcovr -r ..
 
 build-archlinux:
   stage: build
@@ -112,4 +112,4 @@ build-archlinux:
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - cmake --build .
     - cmake --build . --target test
-    - gcovr ..
+    - gcovr -r ..
