@@ -53,6 +53,12 @@ update-tumbleweed-image:
     IMAGE_NAME: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
     BUILD_CONTEXT_DIR: images/opensuse/tumbleweed
 
+update-alpine-image:
+  <<: *prepare-build-image
+  variables:
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME
+    BUILD_CONTEXT_DIR: images/alpine
+
 build-fedora30:
   <<: *ctc
   image: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
@@ -68,3 +74,7 @@ build-openususe-tumbleweed:
 build-archlinux:
   <<: *ctc
   image: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
+
+build-alpine:
+  <<: *ctc
+  image: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME
