@@ -29,52 +29,62 @@ stages:
     - gcovr -r ..
 
 
-update-fedora30-image:
+# update-fedora30-image:
+#   <<: *prepare-build-image
+#   variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
+#     BUILD_CONTEXT_DIR: images/fedora30
+
+update-fedora33-image:
   <<: *prepare-build-image
   variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
-    BUILD_CONTEXT_DIR: images/fedora30
+    IMAGE_NAME: $CI_REGISTRY_IMAGE/fedora-33-$CI_COMMIT_REF_NAME
+    BUILD_CONTEXT_DIR: images/fedora33
 
-update-archlinux-image:
-  <<: *prepare-build-image
-  variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
-    BUILD_CONTEXT_DIR: images/archlinux
+# update-archlinux-image:
+#   <<: *prepare-build-image
+#   variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
+#     BUILD_CONTEXT_DIR: images/archlinux
 
-update-ubuntu-image:
-  <<: *prepare-build-image
-  variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
-    BUILD_CONTEXT_DIR: images/ubuntu-19.04
+# update-ubuntu-image:
+#   <<: *prepare-build-image
+#   variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
+#     BUILD_CONTEXT_DIR: images/ubuntu-19.04
 
-update-tumbleweed-image:
-  <<: *prepare-build-image
-  variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
-    BUILD_CONTEXT_DIR: images/opensuse/tumbleweed
+# update-tumbleweed-image:
+#   <<: *prepare-build-image
+#   variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
+#     BUILD_CONTEXT_DIR: images/opensuse/tumbleweed
 
-update-alpine-image:
-  <<: *prepare-build-image
-  variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME
-    BUILD_CONTEXT_DIR: images/alpine
+# update-alpine-image:
+#   <<: *prepare-build-image
+#   variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME
+#     BUILD_CONTEXT_DIR: images/alpine
 
-build-fedora30:
+# build-fedora30:
+#   <<: *ctc
+#   image: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
+
+build-fedora33:
   <<: *ctc
   image: $CI_REGISTRY_IMAGE/fedora-30-$CI_COMMIT_REF_NAME
 
-build-ubuntu-19.04:
-  <<: *ctc
-  image: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
+# build-ubuntu-19.04:
+#   <<: *ctc
+#   image: $CI_REGISTRY_IMAGE/ubuntu-19.04-$CI_COMMIT_REF_NAME
 
-build-openususe-tumbleweed:
-  <<: *ctc
-  image: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
+# build-openususe-tumbleweed:
+#   <<: *ctc
+#   image: $CI_REGISTRY_IMAGE/opensuse-tumbleweed-$CI_COMMIT_REF_NAME
 
-build-archlinux:
-  <<: *ctc
-  image: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
+# build-archlinux:
+#   <<: *ctc
+#   image: $CI_REGISTRY_IMAGE/archlinux-$CI_COMMIT_REF_NAME
 
-build-alpine:
-  <<: *ctc
-  image: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME
+# build-alpine:
+#   <<: *ctc
+#   image: $CI_REGISTRY_IMAGE/alpine-$CI_COMMIT_REF_NAME

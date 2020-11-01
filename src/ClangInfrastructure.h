@@ -23,7 +23,7 @@ namespace mc {
 
     class ActionFactory : public clang::tooling::FrontendActionFactory {
     public:
-        clang::FrontendAction *create() override;
+        std::unique_ptr<clang::FrontendAction> create() override;
     };
 
     class MetadataGenerateAction : public clang::ASTFrontendAction {

@@ -45,7 +45,7 @@ TEST(mc, static_enumeration) {
 }
 
 
-TEST(mc, static_class) {
+TEST(mc, static_class_methods) {
     using PlainClass = rosewood::meta<basic::PlainClass>;
     constexpr PlainClass plainClass;
 
@@ -65,6 +65,25 @@ TEST(mc, static_class) {
         jinxMethods.emplace_back(method.name);
     });
 }
+
+TEST(mc, static_class_fields) {
+    using PlainClass = rosewood::meta<basic::PlainClass>;
+    constexpr PlainClass plainClass;
+
+    const std::vector<std::string> expectedFields {
+        "floatField",
+        "intField"
+    };
+
+    std::vector<std::string> actualFields;
+
+    plainClass.visit_fields([&actualFields](auto field) constexpr {
+        actualFields.emplace_back(field.name);
+    });
+    EXPECT_EQ(expectedFields, actualFields);
+}
+
+
 
 TEST(mc, runtime_module) {
     constexpr rosewood::meta_BasicDefinitions sbd;

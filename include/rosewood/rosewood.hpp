@@ -63,6 +63,53 @@ namespace rosewood {
     template<typename T>
     struct meta : public nil_t {};
 
+    namespace detail {
+    template <typename T, bool has_metaobject = !std::is_same_v<T, nil_t>>
+    struct optional_metaobject_visitor;
+
+    template <typename T>
+    struct optional_metaobject_visitor<T, true> {
+        using metaobject_type = rosewood::meta<T>;
+        template <typename funcT>
+        static void visit(funcT&& func) {
+            func(metaobject_type{});
+        }
+    };
+
+    template <typename T>
+    struct optional_metaobject_visitor<T, false> {
+        template <typename funcT>
+        static void visit(funcT&&) {}
+    };
+
+    template <typename T>
+    struct optional_argpack_metaobject_visitor;
+
+    template <>
+    struct optional_argpack_metaobject_visitor<std::tuple<>> {
+        template <typename funcT>
+        static void visit(funcT&&) {}
+    };
+
+    template <typename T, template <typename ...> class packerT>
+    struct optional_argpack_metaobject_visitor<packerT<T>> {
+        template <typename funcT>
+        static void visit(funcT&& func) {
+            optional_metaobject_visitor<T>::visit(std::forward<funcT>(func));
+        }
+    };
+
+    template <typename T, typename ...Ts, template <typename ...> class packerT>
+    struct optional_argpack_metaobject_visitor<packerT<T, Ts...>> {
+        template <typename funcT>
+        static void visit(funcT&& func) {
+            optional_metaobject_visitor<T>::visit(std::forward<funcT>(func));
+            optional_argpack_metaobject_visitor<std::tuple<Ts...>>::visit_mo(std::forward<funcT>(func));
+        }
+    };
+
+    } // detail
+
     template<typename Descriptor>
     struct Module {};
 
@@ -299,12 +346,16 @@ namespace rosewood {
         using type_t = Type;
         using address_type = Type ClassType::*;
 
-        constexpr FieldDeclaration(std::string_view nm, address_type addr)
+        constexpr FieldDeclaration(std::string_view nm, address_type addr, int field_index, ptrdiff_t field_offset)
             :name(nm),
-            address(addr) {}
+             address(addr),
+             index(field_index),
+             offset(field_offset) {}
 
         std::string_view name;
         address_type address;
+        int index;
+        ptrdiff_t offset;
 
         void assign_copy(void *obj, void *from) const {
             auto *object = reinterpret_cast<ClassType*>(obj);
@@ -334,6 +385,18 @@ namespace rosewood {
             std::apply([visitor](auto ...methods) {
                 (visitor(methods), ...);
             }, Descriptor::methods);
+        }
+
+        template<typename visitorT>
+        constexpr void visit_fields(visitorT visitor) const  noexcept {
+            std::apply([visitor](auto ...fields) {
+                (visitor(fields), ...);
+            }, Descriptor::fields);
+        }
+
+        template <typename visitorT>
+        constexpr void visit_bases_with_metaobjects(visitorT&& visitor) const noexcept {
+            detail::optional_argpack_metaobject_visitor<typename Descriptor::bases_t>::visit(std::forward<visitorT>(visitor));
         }
     };
 

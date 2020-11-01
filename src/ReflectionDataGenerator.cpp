@@ -7,6 +7,7 @@
 #include <fmt/ostream.h>
 #include <experimental/filesystem>
 #include <clang/Basic/OperatorKinds.h>
+#include <clang/Basic/SourceManager.h>
 
 #include <iostream>
 
@@ -34,6 +35,7 @@ namespace mc {
 
         global_scope.putline("#include <rosewood/rosewood.hpp>");
         global_scope.putline("#include <rosewood/type.hpp>");
+
         auto mainFile = astContext.getSourceManager().getMainFileID();
         auto mainFileLoc = astContext.getSourceManager().getComposedLoc(mainFile, 0);
         auto mainFilePath = astContext.getSourceManager().getFilename(mainFileLoc);
@@ -367,16 +369,14 @@ namespace mc {
             outerScope.inner.rawput("\n");
             ++outerScope.inner;
             int fIndex = 0;
+            const char* prefix = " ";
             for(const auto& field: fields) {
-                const bool notLast = fIndex < (fields.size() - 1);
-                outerScope.putline("rosewood::FieldDeclaration<{}, {}>{{\"{}\", &{}::{}}}{}",
+                outerScope.putline("{0} rosewood::FieldDeclaration<{1}, {2}>{{\"{3}\", &{2}::{3}, {4}, offsetof({2}, {3})}}",
+                                   std::exchange(prefix, ","),
                                    field->getType().getCanonicalType().getAsString(printingPolicy),
                                    clang::QualType(field->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy),
                                    field->getNameAsString(),
-                                   clang::QualType(field->getParent()->getTypeForDecl(), 0).getAsString(printingPolicy),
-                                   field->getNameAsString(),
-                                   notLast ? "," : "");
-                ++fIndex;
+                                   fIndex++);
             }
             --outerScope.inner;
             outerScope.inner.putline("}};");
@@ -482,12 +482,11 @@ namespace mc {
         }
 
         ownScope.putline("using bases_t = std::tuple < ");
-        int baseIndex(0);
+        auto prefix = "";
         for (const auto &base: Record->bases()) {
             if (base.getAccessSpecifier() == clang::AccessSpecifier::AS_public) {
-                ownScope.putline("{} {}", baseIndex == 0 ? " ": ",", base.getType().getCanonicalType().getAsString(printingPolicy));
+                ownScope.putline("{} {}", std::exchange(prefix, ","), base.getType().getCanonicalType().getAsString(printingPolicy));
             }
-            ++baseIndex;
         }
         ownScope.putline(">;");
 

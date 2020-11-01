@@ -35,6 +35,6 @@ install(FILES cmake/rosewood.cmake DESTINATION ${CMAKE_INSTALL_DIR}/rosewood)
 
 configure_file(cmake/rosewood-config.cmake.in lib/cmake/rosewood/rosewood-config.cmake @ONLY)
 
-export(TARGETS rwc rwruntime FILE lib/cmake/rosewood/mc-exports.cmake)
+export(TARGETS rwc rwruntime FILE lib/cmake/rosewood/rosewood-exports.cmake)
 install(EXPORT rosewood-exports DESTINATION ${CMAKE_INSTALL_DIR}/rosewood)
 install(FILES ${PROJECT_BINARY_DIR}/lib/cmake/rosewood/rosewood-config.cmake DESTINATION ${CMAKE_INSTALL_DIR}/rosewood)

@@ -23,8 +23,8 @@
 
 namespace mc {
 
-    clang::FrontendAction *ActionFactory::create() {
-        return new MetadataGenerateAction;
+    std::unique_ptr<clang::FrontendAction> ActionFactory::create() {
+        return std::make_unique<MetadataGenerateAction>();
     }
 
     std::unique_ptr<clang::ASTConsumer> MetadataGenerateAction::CreateASTConsumer(clang::CompilerInstance &Compiler, [[maybe_unused]] llvm::StringRef InFile) {

@@ -13,12 +13,12 @@ add_executable(rwc
 
 target_link_libraries(rwc
     PRIVATE
-    clangTooling
-    clangAST
-    clangBasic
-    clangFrontend
-    clangSerialization
-    clangSema
+    clang-cpp
+#    clangAST
+#    clangBasic
+#    clangFrontend
+#    clangSerialization
+#    clangSema
 
     fmt::fmt
 #    nlohmann_json::nlohmann_json
